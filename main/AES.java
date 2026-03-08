@@ -4,13 +4,11 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
-import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Arrays;
-import java.util.Base64;
 
-public class function_aes_gcm {
+public class AES {
 
     private static final String ALGORITHM = "AES/GCM/NoPadding"; // Algoritma yang digunakan untuk enkripsi, yaitu AES dalam mode GCM dengan padding NoPadding. AES (Advanced Encryption Standard) adalah algoritma kriptografi simetris yang umum digunakan, dan GCM (Galois/Counter Mode) adalah mode operasi yang menyediakan keamanan tambahan dengan menghasilkan tag autentikasi untuk memastikan integritas data. AES didefinisikan di dalam FIPS PUB 197, yang mendefinisikan hanya 3 panjang kunci.
     private static final int AES_KEY_SIZE = 256; // in bits, menentukan panjang kunci AES      
@@ -40,10 +38,6 @@ public class function_aes_gcm {
         byte[] iv = new byte[IV_LENGTH];
         new SecureRandom().nextBytes(iv);
         return iv;
-    }
-
-    public static byte[] encryptString(String plaintext, SecretKey key) {
-        return encrypt(plaintext.getBytes(StandardCharsets.UTF_8), key);
     }
 
     //ambil plaintext → bytes → bikin IV → init cipher AES/GCM → doFinal() → gabung IV + ciphertext(+tag)
@@ -89,36 +83,6 @@ public class function_aes_gcm {
             throw new RuntimeException("Authentication tag tidak valid.", e);
         } catch (Exception e) {
             throw new RuntimeException("Gagal melakukan dekripsi AES-GCM", e);
-        }
-    }
-
-    public static String decryptToString(byte[] ivAndCiphertext, SecretKey key) {
-        byte[] plain = decrypt(ivAndCiphertext, key);
-        return new String(plain, StandardCharsets.UTF_8);
-    }
-
-    public static void main(String[] args) {
-        try {
-            SecretKey key = generateAESKey();
-
-            String plaintext = "Halo AES-GCM! Ini tes sederhana.";
-
-            // encrypt
-            byte[] encrypted = encryptString(plaintext, key);
-
-            // tampilkan ciphertext dalam Base64 biar kebaca
-            String encryptedB64 = Base64.getEncoder().encodeToString(encrypted);
-
-            // decrypt
-            String decrypted = decryptToString(encrypted, key);
-
-            System.out.println("Plaintext  : " + plaintext);
-            System.out.println("EncryptedB64: " + encryptedB64);
-            System.out.println("Decrypted  : " + decrypted);
-            System.out.println("Sama?      : " + plaintext.equals(decrypted));
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 }
