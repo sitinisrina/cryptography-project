@@ -1,3 +1,4 @@
+import java.math.BigInteger;
 import java.util.Base64;
 
 public class Helper {
@@ -26,5 +27,28 @@ public class Helper {
 
     public static byte[] fromBase64ToBinary(String base64) {
         return Base64.getDecoder().decode(base64);
+    }
+
+    public static byte[] toFixedLength(BigInteger value, int length) {
+        byte[] byteArray = value.toByteArray();
+
+        // Jika ada leading zero karena representasi BigInteger
+        if (byteArray.length > 1 && byteArray[0] == 0) {
+            byte[] temp = new byte[byteArray.length - 1];
+            System.arraycopy(byteArray, 1, temp, 0, temp.length);
+            byteArray = temp;
+        }
+
+        if (byteArray.length == length) {
+            return byteArray;
+        } 
+        else if (byteArray.length < length) {
+            byte[] padded = new byte[length];
+            System.arraycopy(byteArray, 0, padded, length - byteArray.length, byteArray.length);
+            return padded;
+        } 
+        else {
+            throw new IllegalArgumentException("Value too large to fit in fixed length");
+        }
     }
 }
