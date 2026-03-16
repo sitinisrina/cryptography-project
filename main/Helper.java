@@ -28,6 +28,14 @@ public class Helper {
         return Base64.getDecoder().decode(base64);
     }
 
+    public static byte[] fromFiletoBinary(String filePath) throws Exception {
+        return java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(filePath));
+    }
+
+    public static void writeBinarytoFile(byte[] data, String filePath) throws Exception {
+        java.nio.file.Files.write(java.nio.file.Paths.get(filePath), data);
+    }   
+
     public static byte[] toFixedLength(BigInteger value, int length) {
         byte[] byteArray = value.toByteArray();
 

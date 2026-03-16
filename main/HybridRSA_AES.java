@@ -1,10 +1,25 @@
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+/*
+1. generate kunci sesi AES dengan AES.generateAESKey()
+2. generate public key dan private key RSA dengan RSA.generateKeyPair()
+3. Enkripsi kunci sesi AES yang sudah di-generate dengan RSA public key, RSA.encrypt(plaintext, publicKey)
+4. Enkripsi plaintext/message dengan kunci sesi AES, AES.encrypt(plaintextBytes, key)
+5. Dekripsi kunci sesi AES dengan RSA private key, RSA.decrypt(ciphertext, privateKey)
+6. Dekripsi ciphertext dengan kunci sesi AES (yang sudah terekripsi), AES.decrypt(ivAndCiphertext, key)
+*/
+
 public class HybridRSA_AES {
+
+    //Generate RSA key pair
+    public static KeyPair generateRSAKeyPair() throws Exception {
+        return RSA.generateKeyPair();
+    }
 
     // Generate AES session key
     public static SecretKey generateSessionKey() throws Exception {
