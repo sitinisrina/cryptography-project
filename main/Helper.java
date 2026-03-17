@@ -5,17 +5,17 @@ import java.util.Base64;
 
 public class Helper {
 
-    public static PublicKey loadPublicKey(String filePath) throws Exception {
+    public static PublicKey loadPublicKey(String filePath, String algorithm) throws Exception {
         byte[] keyBytes = fromFiletoBinary(filePath);
         java.security.spec.X509EncodedKeySpec bobPubKeySpec = new java.security.spec.X509EncodedKeySpec(keyBytes);
-        java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+        java.security.KeyFactory kf = java.security.KeyFactory.getInstance(algorithm);
         return kf.generatePublic(bobPubKeySpec);
     }
 
-    public static PrivateKey loadPrivateKey(String filePath) throws Exception {
+    public static PrivateKey loadPrivateKey(String filePath, String algorithm) throws Exception {
         byte[] keyBytes = fromFiletoBinary(filePath);
         java.security.spec.PKCS8EncodedKeySpec bobPrivKeySpec = new java.security.spec.PKCS8EncodedKeySpec(keyBytes);
-        java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+        java.security.KeyFactory kf = java.security.KeyFactory.getInstance(algorithm);
         return kf.generatePrivate(bobPrivKeySpec);
     }
     

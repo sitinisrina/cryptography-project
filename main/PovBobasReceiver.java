@@ -23,7 +23,7 @@ public class PovBobasReceiver {
 
         try {
             // 1. Take Bob's RSA private key
-            var bobPrivateKey = Helper.loadPrivateKey("bob_private_key.bin");
+            var bobPrivateKey = Helper.loadPrivateKey("bob_private_key.bin", "RSA");
 
             // 2. Read encrypted session key and message from files
             var encryptedSessionKey = Helper.fromFiletoBinary(encryptedSessionKeyPath);

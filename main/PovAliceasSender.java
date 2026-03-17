@@ -26,7 +26,7 @@ public class PovAliceasSender {
 
         try {
             // 1. Take Bob's RSA public key
-            var bobPublicKey = Helper.loadPublicKey("bob_public_key.bin");
+            var bobPublicKey = Helper.loadPublicKey("bob_public_key.bin", "RSA");
 
             // 2. Generate AES session key
             var sessionKey = HybridRSA_AES.generateSessionKey();
