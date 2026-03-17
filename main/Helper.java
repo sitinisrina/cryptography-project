@@ -1,7 +1,23 @@
 import java.math.BigInteger;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.Base64;
 
 public class Helper {
+
+    public static PublicKey loadPublicKey(String filePath) throws Exception {
+        byte[] keyBytes = fromFiletoBinary(filePath);
+        java.security.spec.X509EncodedKeySpec bobPubKeySpec = new java.security.spec.X509EncodedKeySpec(keyBytes);
+        java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+        return kf.generatePublic(bobPubKeySpec);
+    }
+
+    public static PrivateKey loadPrivateKey(String filePath) throws Exception {
+        byte[] keyBytes = fromFiletoBinary(filePath);
+        java.security.spec.PKCS8EncodedKeySpec bobPrivKeySpec = new java.security.spec.PKCS8EncodedKeySpec(keyBytes);
+        java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+        return kf.generatePrivate(bobPrivKeySpec);
+    }
     
     public static String fromBinaryToHexa(byte[] data){
         StringBuilder sb = new StringBuilder();
