@@ -1,3 +1,7 @@
+package main.RSA_AES;
+
+import java.util.Scanner;
+import main.Helper;
 /*
 TAHAP 1
 bob membangkitkan pasangan kunci RSA dengan HybridRSA_AES.generateRSAKeyPair()
@@ -11,7 +15,6 @@ bob membaca dan mengubah ciphertext yang dikirim alice terlebih dahulu ke byte, 
 bob mendekripsi ciphertext dengan HybridRSA_AES.decryptMessage(ciphertext, sessionKey)
 */
 
-import java.util.Scanner;
 
 public class PovBobasReceiver {
     public static void main(String[] args) {
