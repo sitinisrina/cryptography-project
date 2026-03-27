@@ -7,7 +7,7 @@ public class BobDHKeyPair {
     public static void main(String[] args) {
         try {
             PublicKey alicePublicKey = Helper.loadPublicKey("alice_DH_public_key.bin", "DH");
-            var bobKeyPair = HybridDHIES_AES.generateDHKeyPairFromPeerPublicKey(alicePublicKey);
+            var bobKeyPair = DHIES.generateKeyPairFromPeerPublicKey(alicePublicKey);
             var bobPublicKey = bobKeyPair.getPublic();
             var bobPrivateKey = bobKeyPair.getPrivate();
 

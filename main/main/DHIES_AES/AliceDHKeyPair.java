@@ -4,7 +4,7 @@ import main.Helper;
 public class AliceDHKeyPair {
     public static void main(String[] args) {
         try {
-            var aliceKeyPair = HybridDHIES_AES.generateDHKeyPair();
+            var aliceKeyPair = DHIES.generateKeyPair();
             var alicePublicKey = aliceKeyPair.getPublic();
             var alicePrivateKey = aliceKeyPair.getPrivate();
 

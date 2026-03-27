@@ -7,28 +7,35 @@ public class DHIESBobasReceiver {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
         System.out.print("Masukkan path file encrypted message: ");
-        String encryptedMessagePath = scanner.nextLine();  
-        
+        String encryptedMessagePath = scanner.nextLine();
+
         try {
-            //load Bob's DH private key
+            // Load Bob's DH private key
             var bobPrivateKey = Helper.loadPrivateKey("bob_DH_private_key.bin", "DH");
 
-            //load Alice's DH public key
-            var alicePublicKey = Helper.loadPublicKey("alice_DH_public_key.bin", "DH");
+            // Load Alice's ephemeral public key
+            var aliceEphemeralPublicKey = Helper.loadPublicKey("alice_ephemeral_public_key.bin", "DH");
 
-            //compute shared secret
-            byte[] sharedSecret = HybridDHIES_AES.computeSharedSecret(bobPrivateKey, alicePublicKey);
+            // Compute shared secret: Bob private key x Alice ephemeral public key
+            byte[] sharedSecret = DHIES.computeSharedSecret(
+                    bobPrivateKey,
+                    aliceEphemeralPublicKey
+            );
 
-            //derive AES session key from shared secret
-            var sessionKey = HybridDHIES_AES.deriveAESKey(sharedSecret);
-
-            //read encrypted message from file
+            // Read encrypted message from file
             var encryptedMessage = Helper.fromFiletoBinary(encryptedMessagePath);
 
-            //decrypt message with AES session key
-            var decryptedMessage = HybridDHIES_AES.decryptMessage(encryptedMessage, sessionKey);
+            // Read salt from file
+            var salt = Helper.fromFiletoBinary("dhies_salt.bin");
 
-            //write decrypted message to file
+            // Bungkus menjadi object HybridEncryptedData
+            HybridDHIES_AES.HybridEncryptData hybridData =
+                    new HybridDHIES_AES.HybridEncryptData(salt, encryptedMessage);
+
+            // Decrypt message
+            var decryptedMessage = HybridDHIES_AES.decrypt(hybridData, sharedSecret);
+
+            // Write decrypted message to file
             Helper.writeBinarytoFile(decryptedMessage, "decrypted_DHIES_message.txt");
             System.out.println("Pesan berhasil didekripsi dan disimpan sebagai 'decrypted_DHIES_message.txt'.");
 
@@ -37,6 +44,5 @@ public class DHIESBobasReceiver {
         } finally {
             scanner.close();
         }
-
     }
 }

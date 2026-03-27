@@ -7,45 +7,45 @@ import java.security.PublicKey;
 
 import javax.crypto.SecretKey;
 
-/* 
-1. alice generate keypair DH duluan
-2. bob generate keypair DH dengan menggunakan public key alice
-3. menghitung shared secret dari PubKey kedua party
-4. menurunkan kunci sesi AES dari shared secret menggunakan KDF
-5. enkripsi plaintext/message dengan kunci sesi AES yang telah diturunkan
-6. dekripsi ciphertext dengan kunci sesi AES yang telah diturunkan
-*/
-
-
 public class HybridDHIES_AES {
-    //1. Generate DH key pair
-    public static KeyPair generateDHKeyPair() throws Exception {
-        return DHIES.generateKeyPair();
+    public static class HybridEncryptData {
+        private final byte[] salt;
+        private final byte[] ciphertext;
+
+        public HybridEncryptData(byte[] salt, byte[] ciphertext) {
+            this.salt = salt;
+            this.ciphertext = ciphertext;
+        }
+
+        public byte[] getSalt() {
+            return salt;
+        }
+
+        public byte[] getCiphertext() {
+            return ciphertext;
+        }
+
     }
 
-    //2. Generate DH key pair from peer's public key
-    public static KeyPair generateDHKeyPairFromPeerPublicKey(PublicKey peerPublicKey) throws Exception {
-        return DHIES.generateKeyPairFromPeerPublicKey(peerPublicKey);
+    public static HybridEncryptData encrypt(byte[] plaintext, byte[] sharedSecret) throws Exception {
+        if(plaintext == null || sharedSecret == null) {
+            throw new IllegalArgumentException("Plaintext and shared secret cannot be null");
+        }
+        byte[] salt = DHIES.generateRandomSalt();
+        SecretKey aesKey = DHIES.deriveAESKey(sharedSecret, salt);
+
+        byte[] ciphertext = AES.encrypt(plaintext, aesKey);
+        return new HybridEncryptData(salt, ciphertext);
     }
 
-    //3. Compute shared secret
-    public static byte[] computeSharedSecret(PrivateKey privateKey, PublicKey publicKey) throws Exception {
-        return DHIES.computeSharedSecret(privateKey, publicKey);
+    public static byte[] decrypt(HybridEncryptData encryptData, byte[] sharedSecret) throws Exception {
+        if(encryptData == null || sharedSecret == null) {
+            throw new IllegalArgumentException("Encrypt data and shared secret cannot be null");
+        }
+        if(encryptData.getSalt() == null || encryptData.getCiphertext() == null) {
+            throw new IllegalArgumentException("Encrypt data must contain both salt and ciphertext");
+        }
+        SecretKey aesKey = DHIES.deriveAESKey(sharedSecret, encryptData.getSalt());
+        return AES.decrypt(encryptData.getCiphertext(), aesKey);
     }
-
-    //4. Derive AES session key from shared secret
-    public static SecretKey deriveAESKey(byte[] sharedSecret) throws Exception {
-        return DHIES.deriveAESKey(sharedSecret);
-    }
-
-    //5. Encrypt message with AES session key
-    public static byte[] encryptMessage(byte[] plaintext, SecretKey sessionKey) throws Exception {
-        return AES.encrypt(plaintext, sessionKey);
-    }
-
-    //6. Decrypt message with AES session key
-    public static byte[] decryptMessage(byte[] ciphertext, SecretKey sessionKey) throws Exception {
-        return AES.decrypt(ciphertext, sessionKey);
-    }
-
 }

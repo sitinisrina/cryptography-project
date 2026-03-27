@@ -1,7 +1,7 @@
 package main.DHIES_AES;
 
 import main.Helper;
-import java.security.PrivateKey;
+import java.security.KeyPair;
 import java.security.PublicKey;
 import java.util.Scanner;
 
@@ -15,22 +15,44 @@ public class DHIESAliceasSender {
             // Load Bob's public key
             PublicKey bobPublicKey = Helper.loadPublicKey("bob_DH_public_key.bin", "DH");
 
-            // Load Alice's private key from file
-            PrivateKey alicePrivateKey = Helper.loadPrivateKey("alice_DH_private_key.bin", "DH");
+            // Generate Alice ephemeral key pair untuk setiap pengiriman
+            KeyPair aliceEphemeralKeyPair = DHIES.generateKeyPairFromPeerPublicKey(bobPublicKey);
 
-            //compute shared secret
-            byte[] sharedSecret = HybridDHIES_AES.computeSharedSecret(alicePrivateKey, bobPublicKey);
+            // Compute shared secret: Alice ephemeral private key x Bob public key
+            byte[] sharedSecret = DHIES.computeSharedSecret(
+                    aliceEphemeralKeyPair.getPrivate(),
+                    bobPublicKey
+            );
 
-            //derive AES session key from shared secret
-            var sessionKey = HybridDHIES_AES.deriveAESKey(sharedSecret);
+            // Baca file yang akan dienkripsi
+            byte[] fileContent = Helper.fromFiletoBinary(filePath);
 
-            //encrypt message with AES session key
-            var fileContent = Helper.fromFiletoBinary(filePath);
-            var encryptedFileContent = HybridDHIES_AES.encryptMessage(fileContent, sessionKey);
+            // Encrypt file content menggunakan hybrid DHIES-AES
+            HybridDHIES_AES.HybridEncryptData encryptedResult =
+                    HybridDHIES_AES.encrypt(fileContent, sharedSecret);
 
-            // Save the encrypted file
-            Helper.writeBinarytoFile(encryptedFileContent, "encrypted_DHIES_file.bin");
-            System.out.println("File berhasil dienkripsi dan disimpan sebagai 'encrypted_DHIES_file.bin'.");
+            // Simpan ciphertext
+            Helper.writeBinarytoFile(
+                    encryptedResult.getCiphertext(),
+                    "encrypted_DHIES_file.bin"
+            );
+
+            // Simpan salt HKDF
+            Helper.writeBinarytoFile(
+                    encryptedResult.getSalt(),
+                    "dhies_salt.bin"
+            );
+
+            // Simpan ephemeral public key Alice
+            Helper.writeBinarytoFile(
+                    aliceEphemeralKeyPair.getPublic().getEncoded(),
+                    "alice_ephemeral_public_key.bin"
+            );
+
+            System.out.println("File berhasil dienkripsi.");
+            System.out.println("Ciphertext disimpan sebagai 'encrypted_DHIES_file.bin'.");
+            System.out.println("Salt disimpan sebagai 'dhies_salt.bin'.");
+            System.out.println("Ephemeral public key disimpan sebagai 'alice_ephemeral_public_key.bin'.");
 
         } catch (Exception e) {
             e.printStackTrace();
