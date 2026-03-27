@@ -1,6 +1,5 @@
 package main.RSA_AES;
 
-import main.AES;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
