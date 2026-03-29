@@ -1,57 +1,74 @@
 package main.RSA_AES;
 
+import main.BenchmarkHelper;
 import main.Helper;
+
+import java.nio.ByteBuffer;
 import java.util.Scanner;
 
-/*
-TAHAP 1
-alice membangkitkan pasangan kunci RSA dengan HybridRSA_AES.generateRSAKeyPair()
-alice mengambil bob public key dari file "bob_public_key.bin" dengan Helper.loadPublicKey("bob_public_key.bin")
-
-TAHAP 2
-alice membangkitkan kunci sesi AES dengan HybridRSA_AES.generateSessionKey()
-alice mengenkripsi kunci sesi AES dengan kunci publik Bob (65537), HybridRSA_AES.encryptSessionKey(sessionKey, publicKey)
-alice menyimpan encrypted session key, untuk dikirimkan bersamaan dengan cipher text.
-
-TAHAP 3
-alice menginput plaintext (apapun) dari user dengan scanner
-alice mengenkripsi plaintext dengan HybridRSA_AES.encryptMessage(plaintext, sessionKey)
-alice encoding hasil cipher text dan encrypted session key, kemudian dikirim ke Bob.
-
-*/
-
 public class PovAliceasSender {
-    
+
+    public static byte[] buildEncryptedPackage(byte[] encryptedSessionKey, byte[] encryptedFileContent) {
+        if (encryptedSessionKey == null || encryptedFileContent == null) {
+            throw new IllegalArgumentException("Komponen paket RSA-AES tidak boleh null.");
+        }
+
+        int totalLength = Integer.BYTES * 2
+                + encryptedSessionKey.length
+                + encryptedFileContent.length;
+
+        ByteBuffer buffer = ByteBuffer.allocate(totalLength);
+        buffer.putInt(encryptedSessionKey.length);
+        buffer.put(encryptedSessionKey);
+        buffer.putInt(encryptedFileContent.length);
+        buffer.put(encryptedFileContent);
+
+        return buffer.array();
+    }
+
+    public static byte[] encryptMode(byte[] fileContent) throws Exception {
+        var bobPublicKey = Helper.loadPublicKey("bob_rsa_public_key.bin", "RSA");
+
+        var sessionKey = HybridRSA_AES.generateSessionKey();
+        var encryptedSessionKey = HybridRSA_AES.encryptSessionKey(sessionKey, bobPublicKey);
+        var encryptedFileContent = HybridRSA_AES.encryptMessage(fileContent, sessionKey);
+
+        return buildEncryptedPackage(encryptedSessionKey, encryptedFileContent);
+    }
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.print("Masukkan path file yang ingin dikirim: ");
-        String filePath = scanner.nextLine();
 
         try {
-            // 1. Take Bob's RSA public key
-            var bobPublicKey = Helper.loadPublicKey("bob_public_key.bin", "RSA");
+            System.out.print("Masukkan path file yang ingin dikirim: ");
+            String filePath = scanner.nextLine();
 
-            // 2. Generate AES session key
-            var sessionKey = HybridRSA_AES.generateSessionKey();
+            byte[] fileContent = Helper.fromFiletoBinary(filePath);
+            final byte[][] holder = new byte[1][];
 
-            // 3. Encrypt AES session key with RSA public key
-            var encryptedSessionKey = HybridRSA_AES.encryptSessionKey(sessionKey, bobPublicKey);
+            BenchmarkHelper.BenchmarkResult benchmarkResult = BenchmarkHelper.measure(() -> {
+                holder[0] = encryptMode(fileContent);
+            });
 
-            // 4. Encrypt file content with AES session key
-            var fileContent = Helper.fromFiletoBinary(filePath);
-            var encryptedFileContent = HybridRSA_AES.encryptMessage(fileContent, sessionKey);
+            byte[] encryptedPackage = holder[0];
 
-            // 5. Save encrypted data to files
-            Helper.writeBinarytoFile(encryptedSessionKey, "encrypted_session_key.bin");
-            Helper.writeBinarytoFile(encryptedFileContent, "encrypted_file.bin");
+            Helper.writeBinarytoFile(encryptedPackage, "encrypted_rsa_aes_package.bin");
 
-            System.out.println("File berhasil dienkripsi dan disimpan sebagai 'encrypted_session_key.bin' dan 'encrypted_file.bin'.");
+            BenchmarkHelper.writeBenchmarkResult(
+                    "alice_RSA_benchmark.txt",
+                    "Alice",
+                    benchmarkResult
+            );
+
+            System.out.println("File berhasil dienkripsi dengan skema RSA-AES.");
+            System.out.println("Encrypted session key dan encrypted file disimpan dalam satu file: 'encrypted_rsa_aes_package.bin'.");
+            System.out.println("Hasil benchmark Alice disimpan sebagai 'alice_RSA_benchmark.txt'.");
 
         } catch (Exception e) {
+            System.err.println("Terjadi kesalahan saat proses enkripsi RSA-AES:");
             e.printStackTrace();
         } finally {
             scanner.close();
         }
-
     }
 }

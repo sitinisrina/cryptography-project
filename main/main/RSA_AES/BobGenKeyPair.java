@@ -9,10 +9,10 @@ public class BobGenKeyPair {
             var bobPublicKey = rsaKeyPair.getPublic();
             var bobPrivateKey = rsaKeyPair.getPrivate();
 
-            Helper.writeBinarytoFile(bobPublicKey.getEncoded(), "bob_public_key.bin");
-            Helper.writeBinarytoFile(bobPrivateKey.getEncoded(), "bob_private_key.bin");
+            Helper.writeBinarytoFile(bobPublicKey.getEncoded(), "bob_rsa_public_key.bin");
+            Helper.writeBinarytoFile(bobPrivateKey.getEncoded(), "bob_rsa_private_key.bin");
 
-            System.out.println("Bob's RSA key pair generated and saved to 'bob_public_key.bin' and 'bob_private_key.bin'.");
+            System.out.println("Bob's RSA key pair generated and saved to 'bob_rsa_public_key.bin' and 'bob_rsa_private_key.bin'.");
         } catch (Exception e) {
             e.printStackTrace();
         }
