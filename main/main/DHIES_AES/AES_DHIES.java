@@ -5,6 +5,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import java.security.SecureRandom;
 import java.util.Arrays;
+//ku
 
 public class AES_DHIES {
 

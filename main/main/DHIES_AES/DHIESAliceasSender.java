@@ -1,11 +1,31 @@
 package main.DHIES_AES;
 
 import main.Helper;
+import main.BenchmarkHelper;
 import java.security.KeyPair;
 import java.security.PublicKey;
 import java.util.Scanner;
 
 public class DHIESAliceasSender {
+
+    public static byte[] encryptMode(byte[] fileContent, PublicKey bobPublicKey) throws Exception {
+        KeyPair aliceEphemeralKeyPair = DHIES.generateKeyPairFromPeerPublicKey(bobPublicKey);
+
+        byte[] sharedSecret = DHIES.computeSharedSecret(
+                aliceEphemeralKeyPair.getPrivate(),
+                bobPublicKey
+        );
+
+        HybridDHIES_AES.HybridEncryptData encryptedResult = HybridDHIES_AES.encrypt(fileContent, sharedSecret);
+
+        byte[] ephemeralPublicKey = aliceEphemeralKeyPair.getPublic().getEncoded();
+        byte[] salt = encryptedResult.getSalt();
+        byte[] ciphertext = encryptedResult.getCiphertext();
+        byte[] tag = encryptedResult.getTag();
+
+        return Helper.buildEncryptedPackage(ephemeralPublicKey, salt, ciphertext, tag);
+    }
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
@@ -13,54 +33,28 @@ public class DHIESAliceasSender {
             System.out.print("Masukkan path file yang ingin dikirim: ");
             String filePath = scanner.nextLine();
 
-            // Load public key Bob (static public key receiver)
             PublicKey bobPublicKey = Helper.loadPublicKey("bob_DH_public_key.bin", "DH");
-
-            // Generate ephemeral key pair Alice untuk setiap pengiriman
-            KeyPair aliceEphemeralKeyPair = DHIES.generateKeyPairFromPeerPublicKey(bobPublicKey);
-
-            // Compute shared secret: Alice ephemeral private key x Bob public key
-            byte[] sharedSecret = DHIES.computeSharedSecret(
-                    aliceEphemeralKeyPair.getPrivate(),
-                    bobPublicKey
-            );
-
-            // Baca file plaintext yang akan dikirim
             byte[] fileContent = Helper.fromFiletoBinary(filePath);
 
-            // Encrypt file content menggunakan hybrid DHIES-AES
-            HybridDHIES_AES.HybridEncryptData encryptedResult =
-                    HybridDHIES_AES.encrypt(fileContent, sharedSecret);
+            final byte[][] holder = new byte[1][];
 
-            // Simpan ciphertext
-            Helper.writeBinarytoFile(
-                    encryptedResult.getCiphertext(),
-                    "encrypted_DHIES_file.bin"
-            );
+            BenchmarkHelper.BenchmarkResult benchmarkResult = BenchmarkHelper.measure(() -> {
+                holder[0] = encryptMode(fileContent, bobPublicKey);
+            });
 
-            // Simpan salt HKDF
-            Helper.writeBinarytoFile(
-                    encryptedResult.getSalt(),
-                    "dhies_salt.bin"
-            );
+            byte[] encryptedPackage = holder[0];
 
-            // Simpan authentication tag / MAC
-            Helper.writeBinarytoFile(
-                    encryptedResult.getTag(),
-                    "dhies_tag.bin"
-            );
+            Helper.writeBinarytoFile(encryptedPackage, "encrypted_DHIES_file.bin");
 
-            // Simpan ephemeral public key Alice (komponen U)
-            Helper.writeBinarytoFile(
-                    aliceEphemeralKeyPair.getPublic().getEncoded(),
-                    "alice_ephemeral_public_key.bin"
+            BenchmarkHelper.writeBenchmarkResult(
+                    "alice_benchmark.txt",
+                    "Alice",
+                    benchmarkResult
             );
 
             System.out.println("File berhasil dienkripsi dengan skema DHIES-AES.");
-            System.out.println("Ciphertext disimpan sebagai 'encrypted_DHIES_file.bin'.");
-            System.out.println("Salt disimpan sebagai 'dhies_salt.bin'.");
-            System.out.println("Tag disimpan sebagai 'dhies_tag.bin'.");
-            System.out.println("Ephemeral public key disimpan sebagai 'alice_ephemeral_public_key.bin'.");
+            System.out.println("Seluruh komponen DHIES (ephemeral public key, salt, tag, ciphertext) disimpan dalam satu file: 'encrypted_DHIES_file.bin'.");
+            System.out.println("Hasil benchmark Alice disimpan sebagai 'alice_benchmark.txt'.");
 
         } catch (Exception e) {
             System.err.println("Terjadi kesalahan saat proses enkripsi DHIES-AES:");
