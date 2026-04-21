@@ -44,6 +44,7 @@ public class PovAliceasSender {
             String filePath = scanner.nextLine();
 
             byte[] fileContent = Helper.fromFiletoBinary(filePath);
+            String originalHash = Helper.sha256(fileContent);
             final byte[][] holder = new byte[1][];
 
             BenchmarkHelper.BenchmarkResult benchmarkResult = BenchmarkHelper.measure(() -> {
@@ -51,8 +52,11 @@ public class PovAliceasSender {
             });
 
             byte[] encryptedPackage = holder[0];
-
+            // String ciphertextPackageHash = Helper.sha256(encryptedPackage);
             Helper.writeBinarytoFile(encryptedPackage, "encrypted_rsa_aes_package.bin");
+
+            System.out.println("Hash SHA-256 file asli          : " + originalHash);
+            // System.out.println("Hash SHA-256 paket ciphertext   : " + ciphertextPackageHash);
 
             BenchmarkHelper.writeBenchmarkResult(
                     "alice_RSA_benchmark.txt",

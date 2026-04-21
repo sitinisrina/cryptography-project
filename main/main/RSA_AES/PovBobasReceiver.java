@@ -72,8 +72,9 @@ public class PovBobasReceiver {
             });
 
             byte[] decryptedMessage = holder[0];
+            String decryptedHash = Helper.sha256(decryptedMessage);
 
-            Helper.writeBinarytoFile(decryptedMessage, "decrypted_message.pdf");
+            Helper.writeBinarytoFile(decryptedMessage, "decrypted_message.mp4");
 
             BenchmarkHelper.writeBenchmarkResult(
                     "bob_RSA_benchmark.txt",
@@ -81,7 +82,8 @@ public class PovBobasReceiver {
                     benchmarkResult
             );
 
-            System.out.println("Pesan berhasil didekripsi dan disimpan sebagai 'decrypted_message.pdf'.");
+            System.out.println("Hash SHA-256 hasil dekripsi     : " + decryptedHash);   
+            System.out.println("Pesan berhasil didekripsi dan disimpan sebagai 'decrypted_message.mp4'.");
             System.out.println("Hasil benchmark Bob disimpan sebagai 'bob_RSA_benchmark.txt'.");
 
         } catch (Exception e) {

@@ -47,8 +47,9 @@ public class DHIESBobasReceiver {
             });
 
             byte[] decryptedMessage = holder[0];
+            String decryptedHash = Helper.sha256(decryptedMessage);
 
-            Helper.writeBinarytoFile(decryptedMessage, "decrypted_DHIES_message.jpg");
+            Helper.writeBinarytoFile(decryptedMessage, "decrypted_DHIES_message.mp4");
 
             BenchmarkHelper.writeBenchmarkResult(
                     "bob_benchmark.txt",
@@ -56,7 +57,8 @@ public class DHIESBobasReceiver {
                     benchmarkResult
             );
 
-            System.out.println("Pesan berhasil didekripsi dan disimpan sebagai 'decrypted_DHIES_message.jpg'.");
+            System.out.println("Hash SHA-256 hasil dekripsi     : " + decryptedHash);
+            System.out.println("Pesan berhasil didekripsi dan disimpan sebagai 'decrypted_DHIES_message.mp4'.");
             System.out.println("Hasil benchmark Bob disimpan sebagai 'bob_benchmark.txt'.");
 
         } catch (SecurityException e) {

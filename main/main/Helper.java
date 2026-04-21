@@ -7,6 +7,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.security.MessageDigest;
 
 
 public class Helper {
@@ -68,6 +69,16 @@ public class Helper {
     public static void writeBinarytoFile(byte[] data, String filePath) throws Exception {
         java.nio.file.Files.write(java.nio.file.Paths.get(filePath), data);
     }   
+
+    public static String sha256(byte[] data) throws Exception {
+        if (data == null) {
+            throw new IllegalArgumentException("Data tidak boleh null.");
+        }
+
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hashBytes = digest.digest(data);
+        return fromBinaryToHexa(hashBytes);
+    }    
 
     public static byte[] buildEncryptedPackage(byte[] ephemeralPublicKey, byte[] salt, byte[] ciphertext, byte[] tag) {
         if (ephemeralPublicKey == null || salt == null || ciphertext == null || tag == null) {

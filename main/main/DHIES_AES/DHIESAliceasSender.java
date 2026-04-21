@@ -35,6 +35,7 @@ public class DHIESAliceasSender {
 
             PublicKey bobPublicKey = Helper.loadPublicKey("bob_DH_public_key.bin", "DH");
             byte[] fileContent = Helper.fromFiletoBinary(filePath);
+            String originalHash = Helper.sha256(fileContent);
 
             final byte[][] holder = new byte[1][];
 
@@ -52,6 +53,7 @@ public class DHIESAliceasSender {
                     benchmarkResult
             );
 
+            System.out.println("Hash SHA-256 file asli          : " + originalHash);
             System.out.println("File berhasil dienkripsi dengan skema DHIES-AES.");
             System.out.println("Seluruh komponen DHIES (ephemeral public key, salt, tag, ciphertext) disimpan dalam satu file: 'encrypted_DHIES_file.bin'.");
             System.out.println("Hasil benchmark Alice disimpan sebagai 'alice_benchmark.txt'.");
