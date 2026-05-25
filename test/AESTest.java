@@ -1,4 +1,8 @@
 import org.junit.jupiter.api.Test;
+
+import main.RSA_AES.AES;
+import main.Helper;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import javax.crypto.SecretKey;

@@ -9,17 +9,16 @@
     <artifactId>sourcecodekripto</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-    <!-- Versi Java -->
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <!-- Diubah dari 17 ke 23 agar sesuai dengan Java 23.0.1 yang terinstall -->
+        <maven.compiler.source>23</maven.compiler.source>
+        <maven.compiler.target>23</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <!-- Library yang dibutuhkan -->
     <dependencies>
 
-        <!-- JUnit 5 untuk unit testing -->
+        <!-- JUnit 5 untuk unit testing — tidak diubah -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -27,22 +26,74 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- JavaFX Controls: Button, Label, ProgressBar, ToggleButton, dll -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>23.0.1</version>
+        </dependency>
+
+        <!-- JavaFX FXML: untuk file .fxml layout tiap layar -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>23.0.1</version>
+        </dependency>
+
+        <!-- JavaFX Media: untuk extract poster frame dari file MP4 -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
+            <version>23.0.1</version>
+        </dependency>
+
+        <!-- JavaFX Web: untuk WebView dan WebEngine (GUI berbasis HTML) -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-web</artifactId>
+            <version>23.0.1</version>
+        </dependency>
+
+        <!-- JavaFX Swing: untuk konversi BufferedImage (PDFBox) ke JavaFX Image -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-swing</artifactId>
+            <version>23.0.1</version>
+        </dependency>
+
+        <!-- PDFBox: untuk render halaman pertama PDF sebagai preview -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
     </dependencies>
 
-    <!-- Konfigurasi build -->
     <build>
 
-        <!-- Karena kita tidak pakai src/main/java -->
+        <!-- Struktur folder custom — tidak diubah -->
         <sourceDirectory>main</sourceDirectory>
         <testSourceDirectory>test</testSourceDirectory>
 
         <plugins>
 
-            <!-- Plugin untuk menjalankan unit test -->
+            <!-- Plugin unit test — tidak diubah -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
+            </plugin>
+
+            <!-- JavaFX Maven Plugin: untuk menjalankan GUI dengan "mvn javafx:run" -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <!-- Sesuai struktur folder: main/main/GUI/MainApp.java -->
+                    <mainClass>main.GUI.MainApp</mainClass>
+                </configuration>
             </plugin>
 
         </plugins>

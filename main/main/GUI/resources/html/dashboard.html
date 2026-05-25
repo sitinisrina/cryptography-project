@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>CryptoDemo</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- STEPPER -->
+  <nav class="stepper">
+    <div class="stepper-item active" id="step-1">
+      <div class="stepper-node">
+        <div class="stepper-circle">1</div>
+        <span class="stepper-label">File & Mode</span>
+      </div>
+    </div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item" id="step-2">
+      <div class="stepper-node">
+        <div class="stepper-circle">2</div>
+        <span class="stepper-label">Preview</span>
+      </div>
+    </div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item" id="step-3">
+      <div class="stepper-node">
+        <div class="stepper-circle">3</div>
+        <span class="stepper-label">Skema</span>
+      </div>
+    </div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item" id="step-4">
+      <div class="stepper-node">
+        <div class="stepper-circle">4</div>
+        <span class="stepper-label">Proses</span>
+      </div>
+    </div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item" id="step-5">
+      <div class="stepper-node">
+        <div class="stepper-circle">5</div>
+        <span class="stepper-label">Hasil</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- CONTENT -->
+  <div class="content" style="padding: 20px 48px; gap: 16px;">
+
+    <!-- Header -->
+    <div class="page-header animate-in" style="margin-bottom:0">
+      <div class="page-title">Selamat datang di CryptoDemo</div>
+      <div class="page-subtitle">Demonstrasi enkripsi dan dekripsi file menggunakan skema kriptografi hibrida</div>
+    </div>
+
+    <!-- Mode Toggle -->
+    <div class="animate-in" style="display:flex; flex-direction:column; gap:8px;">
+      <div class="section-title">Mode Operasi</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="btn-encrypt" onclick="setMode('ENCRYPT')">
+          Enkripsi
+        </button>
+        <button class="mode-btn" id="btn-decrypt" onclick="setMode('DECRYPT')">
+          Dekripsi
+        </button>
+      </div>
+    </div>
+
+    <!-- Drop Zone -->
+    <div class="animate-in" style="display:flex; flex-direction:column; gap:8px;">
+      <div class="section-title" id="file-section-label">File Plaintext</div>
+
+      <div class="drop-zone" id="drop-zone" onclick="triggerFilePicker()">
+        <div class="drop-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+          </svg>
+        </div>
+        <div class="drop-title" id="drop-title">Klik untuk memilih file</div>
+        <div class="drop-hint" id="drop-hint">
+          Mendukung semua format — PDF, MP4, TXT, PNG, JPG, dan lainnya<br>
+          Ukuran maksimal <strong>2 GB</strong>
+        </div>
+      </div>
+
+      <!-- File chip — muncul setelah file dipilih -->
+      <div id="file-chip" style="display:none;"></div>
+
+      <!-- Error alert -->
+      <div id="error-alert" style="display:none;"></div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar animate-in">
+    <div style="font-size:12px; color:var(--text-muted);" id="status-text">
+      Pilih mode dan file untuk melanjutkan
+    </div>
+    <div class="bottom-bar-right">
+      <button class="btn btn-primary" id="btn-next" disabled onclick="goNext()">
+        Lanjut
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // State lokal layar ini
+  let currentMode = 'ENCRYPT';
+  let fileSelected = false;
+
+  // ---- Mode toggle ----
+  function setMode(mode) {
+    currentMode = mode;
+
+    document.getElementById('btn-encrypt').classList.toggle('active', mode === 'ENCRYPT');
+    document.getElementById('btn-decrypt').classList.toggle('active', mode === 'DECRYPT');
+
+    // Update label & hint sesuai mode
+    if (mode === 'DECRYPT') {
+      document.getElementById('file-section-label').textContent = 'File Ciphertext';
+      document.getElementById('drop-title').textContent = 'Klik untuk memilih file ciphertext';
+      document.getElementById('drop-hint').innerHTML =
+        'Hanya menerima file <strong>.bin</strong> hasil enkripsi<br>Ukuran maksimal <strong>2 GB</strong>';
+    } else {
+      document.getElementById('file-section-label').textContent = 'File Plaintext';
+      document.getElementById('drop-title').textContent = 'Klik untuk memilih file';
+      document.getElementById('drop-hint').innerHTML =
+        'Mendukung semua format — PDF, MP4, TXT, PNG, JPG, dan lainnya<br>Ukuran maksimal <strong>2 GB</strong>';
+    }
+
+    // Kirim ke Java
+    if (window.javaBridge) window.javaBridge.setMode(mode);
+
+    // Reset file jika sudah dipilih sebelumnya
+    if (fileSelected) resetFileSelection();
+  }
+
+  // ---- File picker ----
+  function triggerFilePicker() {
+    if (window.javaBridge) window.javaBridge.selectFile();
+  }
+
+  // ---- Callback dari Java: file berhasil dipilih ----
+  function onFileSelected(filePath, fileName, fileSizeBytes, fileExtension) {
+    fileSelected = true;
+    hideError();
+
+    // Sembunyikan drop zone, tampilkan file chip
+    document.getElementById('drop-zone').style.display = 'none';
+    const chip = document.getElementById('file-chip');
+    chip.innerHTML = buildFileChip(fileName, fileSizeBytes, fileExtension);
+    chip.style.display = 'flex';
+
+    // Update status & tombol lanjut
+    document.getElementById('status-text').textContent = 'File dipilih — siap dilanjutkan';
+    document.getElementById('btn-next').disabled = false;
+  }
+
+  // ---- Callback dari Java: error ----
+  function onFileError(message) {
+    showError(message);
+    resetFileSelection();
+  }
+
+  // ---- Tombol Lanjut ----
+  function goNext() {
+    if (!fileSelected) return;
+    if (window.javaBridge) window.javaBridge.navigateTo('preview.html');
+  }
+
+  // ---- Helpers ----
+  function buildFileChip(name, sizeBytes, ext) {
+    const icon = getFileIcon(ext);
+    const sizeStr = formatSize(sizeBytes);
+    return `
+      <div class="file-chip" style="width:100%;">
+        <div class="file-chip-icon" style="background:var(--bg-active)">${icon}</div>
+        <div class="file-chip-info">
+          <div class="file-chip-name">${escapeHtml(name)}</div>
+          <div class="file-chip-meta">${sizeStr} · ${ext.toUpperCase() || 'File'}</div>
+        </div>
+        <button class="btn btn-ghost" style="padding:6px 10px; font-size:11px;" onclick="resetFileSelection()">
+          Ganti
+        </button>
+      </div>`;
+  }
+
+  function resetFileSelection() {
+    fileSelected = false;
+    document.getElementById('drop-zone').style.display = 'flex';
+    document.getElementById('file-chip').style.display = 'none';
+    document.getElementById('file-chip').innerHTML = '';
+    document.getElementById('btn-next').disabled = true;
+    document.getElementById('status-text').textContent = 'Pilih mode dan file untuk melanjutkan';
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-alert');
+    el.innerHTML = `<div class="alert alert-danger">⚠ ${escapeHtml(msg)}</div>`;
+    el.style.display = 'block';
+  }
+
+  function hideError() {
+    const el = document.getElementById('error-alert');
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }
+
+  function getFileIcon(ext) {
+    const icons = {
+      mp4:'🎬', mov:'🎬', avi:'🎬',
+      pdf:'📄',
+      txt:'📝', md:'📝', csv:'📝',
+      png:'🖼', jpg:'🖼', jpeg:'🖼', gif:'🖼', webp:'🖼',
+      bin:'🔒', zip:'📦', rar:'📦'
+    };
+    return icons[ext] || '📁';
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
+    return (bytes/(1024*1024*1024)).toFixed(2) + ' GB';
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ---- Inisialisasi: set default mode ke Java ----
+  window.onload = function() {
+    setTimeout(function() {
+      if (window.javaBridge) window.javaBridge.setMode('ENCRYPT');
+    }, 200);
+  };
+</script>
+</body>
+</html>

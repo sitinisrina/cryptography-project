@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>CryptoDemo — Proses</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .process-layout {
+      display: grid;
+      grid-template-columns: 1fr 260px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    /* Step list */
+    .step-list { display: flex; flex-direction: column; gap: 4px; }
+
+    .step-item {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      transition: all var(--dur-mid) var(--ease);
+    }
+    .step-item.waiting  { opacity: 0.4; }
+    .step-item.running  { background: var(--accent-dim); border-color: var(--accent-border); opacity: 1; }
+    .step-item.done     { background: var(--success-dim); border-color: var(--success-border); opacity: 1; }
+    .step-item.error    { background: var(--danger-dim);  border-color: var(--danger-border);  opacity: 1; }
+
+    .step-bullet {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 1px solid var(--border-default);
+      background: var(--bg-elevated);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+      color: var(--text-muted); flex-shrink: 0; margin-top: 1px;
+      transition: all var(--dur-mid) var(--ease);
+    }
+    .step-item.running .step-bullet {
+      border-color: var(--accent); color: var(--accent);
+      background: var(--accent-dim);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .step-item.done .step-bullet {
+      background: var(--success); border-color: var(--success); color: #fff;
+    }
+    .step-item.error .step-bullet {
+      background: var(--danger); border-color: var(--danger); color: #fff;
+    }
+
+    .step-body { flex: 1; min-width: 0; }
+    .step-name {
+      font-size: 13px; font-weight: 500;
+      color: var(--text-secondary);
+      transition: color var(--dur-mid) var(--ease);
+    }
+    .step-item.running .step-name,
+    .step-item.done .step-name { color: var(--text-primary); }
+
+    .step-detail {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-muted); margin-top: 3px;
+      transition: color var(--dur-mid) var(--ease);
+    }
+    .step-item.done .step-detail { color: var(--success); }
+
+    .step-duration {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--success); white-space: nowrap;
+      flex-shrink: 0; opacity: 0;
+      transition: opacity var(--dur-mid) var(--ease);
+      align-self: center;
+    }
+    .step-item.done .step-duration { opacity: 1; }
+
+    /* Connector line between steps */
+    .step-connector {
+      width: 1px; height: 8px;
+      background: var(--border-subtle);
+      margin-left: 28px;
+      transition: background var(--dur-mid) var(--ease);
+    }
+    .step-connector.done { background: var(--success-border); }
+
+    /* Sidebar info */
+    .info-sidebar { display: flex; flex-direction: column; gap: 10px; }
+
+    .scheme-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; font-family: var(--font-mono);
+    }
+
+    /* Overall progress */
+    .overall-progress {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    /* Done banner */
+    .done-banner {
+      display: none;
+      background: var(--success-dim);
+      border: 1px solid var(--success-border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      align-items: center; gap: 10px;
+      animation: fadeSlideUp var(--dur-slow) var(--ease) both;
+    }
+    .done-banner.show { display: flex; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- STEPPER -->
+  <nav class="stepper">
+    <div class="stepper-item done"><div class="stepper-node"><div class="stepper-circle">✓</div><span class="stepper-label">File & Mode</span></div></div>
+    <div class="stepper-line" style="background:var(--success-border)"></div>
+    <div class="stepper-item done"><div class="stepper-node"><div class="stepper-circle">✓</div><span class="stepper-label">Preview</span></div></div>
+    <div class="stepper-line" style="background:var(--success-border)"></div>
+    <div class="stepper-item done"><div class="stepper-node"><div class="stepper-circle">✓</div><span class="stepper-label">Skema</span></div></div>
+    <div class="stepper-line" style="background:var(--success-border)"></div>
+    <div class="stepper-item active"><div class="stepper-node"><div class="stepper-circle">4</div><span class="stepper-label">Proses</span></div></div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item"><div class="stepper-node"><div class="stepper-circle">5</div><span class="stepper-label">Hasil</span></div></div>
+  </nav>
+
+  <!-- CONTENT -->
+  <div class="content" style="padding:16px 48px; gap:14px; flex:1; overflow-y:auto;">
+
+    <div class="page-header animate-in" style="margin-bottom:0">
+      <div class="page-title" id="page-title">Memulai proses...</div>
+      <div class="page-subtitle" id="page-subtitle">Menyiapkan...</div>
+    </div>
+
+    <div class="process-layout animate-in">
+
+      <!-- Kiri: Step list -->
+      <div style="display:flex; flex-direction:column; gap:0;">
+
+        <!-- Overall progress bar -->
+        <div class="overall-progress" style="margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="section-title" style="margin:0">Progress</div>
+            <span id="progress-label" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">0 / 0 langkah</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill" style="width:0%; transition: width 0.4s ease;"></div>
+          </div>
+          <div id="current-step-label" style="font-size:11px; color:var(--text-muted);">Menunggu proses dimulai...</div>
+        </div>
+
+        <!-- Step items — diisi oleh JS -->
+        <div class="step-list" id="step-list"></div>
+
+        <!-- Done banner -->
+        <div class="done-banner" id="done-banner" style="margin-top:12px;">
+          <span style="font-size:20px;">✓</span>
+          <div>
+            <div style="font-size:13px; font-weight:600; color:var(--success);">Proses selesai</div>
+            <div id="done-detail" style="font-size:11px; color:var(--text-secondary); margin-top:2px;"></div>
+          </div>
+        </div>
+
+        <!-- Error banner -->
+        <div class="alert alert-danger" id="error-banner" style="display:none; margin-top:12px;"></div>
+
+      </div>
+
+      <!-- Kanan: Info sidebar -->
+      <div class="info-sidebar">
+
+        <div class="section-title" style="margin-bottom:0">Informasi Sesi</div>
+
+        <div class="card-sm animate-in">
+          <div class="card-label">Skema</div>
+          <div id="info-scheme" style="margin-top:4px;"></div>
+        </div>
+
+        <div class="card-sm animate-in">
+          <div class="card-label">Mode</div>
+          <div class="card-value" id="info-mode">—</div>
+        </div>
+
+        <div class="card-sm animate-in">
+          <div class="card-label">File Input</div>
+          <div class="card-value" id="info-file" style="word-break:break-all; font-size:12px;">—</div>
+        </div>
+
+        <div class="card-sm animate-in" id="timing-card" style="display:none;">
+          <div class="card-label">Total Waktu</div>
+          <div class="card-value" style="font-family:var(--font-mono);" id="info-timing">—</div>
+        </div>
+
+        <div class="card-sm animate-in" id="output-size-card" style="display:none;">
+          <div class="card-label">Ukuran Output</div>
+          <div class="card-value" style="font-family:var(--font-mono);" id="info-output-size">—</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar animate-in">
+    <button class="btn btn-ghost" id="btn-back" onclick="goBack()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Kembali
+    </button>
+    <div class="bottom-bar-right">
+      <span style="font-size:12px; color:var(--text-muted);" id="status-text">Proses berjalan...</span>
+      <button class="btn btn-primary" id="btn-next" disabled onclick="goNext()">
+        Lihat Hasil
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+<script>
+  // State
+  let totalSteps = 0;
+  let completedSteps = 0;
+  let processStartTime = Date.now();
+  let stepStartTimes = {};
+  let processFinished = false;
+
+  // Definisi steps per skema & mode
+  const STEP_DEFS = {
+    RSA_AES: {
+      ENCRYPT: [
+        { name: 'Membaca file plaintext',              detail: 'Memuat byte dari disk' },
+        { name: 'Membangkitkan session key AES-256',   detail: 'CSPRNG → 256-bit key' },
+        { name: 'Enkripsi data → AES-256-GCM',         detail: 'IV 12-byte · ciphertext · auth tag 128-bit' },
+        { name: 'Enkripsi session key → RSA-OAEP',     detail: 'RSA-OAEP-SHA256 · 2048-bit' },
+        { name: 'Membangun paket & menyimpan output',  detail: 'len(Ck) ‖ Ck ‖ len(Cm) ‖ Cm → .bin' }
+      ],
+      DECRYPT: [
+        { name: 'Membaca paket ciphertext',            detail: 'Memuat file .bin dari disk' },
+        { name: 'Parsing paket — ekstrak Ck dan Cm',  detail: 'Baca header length prefix' },
+        { name: 'Dekripsi session key → RSA-OAEP',    detail: 'RSA private key decrypt' },
+        { name: 'Dekripsi data → AES-256-GCM',        detail: 'Verifikasi auth tag + dekripsi' },
+        { name: 'Menyimpan hasil dekripsi',            detail: 'Tulis plaintext ke file output' }
+      ]
+    },
+    DHIES_AES: {
+      ENCRYPT: [
+        { name: 'Membaca file plaintext',                           detail: 'Memuat byte dari disk' },
+        { name: 'Memuat kunci publik DH Bob',                       detail: 'Load bob_DH_public_key.bin' },
+        { name: 'Membangkitkan kunci ephemeral Alice (u, U=g^u)',   detail: 'DH key pair generation' },
+        { name: 'Menghitung shared secret Z = DH(u, BobPubKey)',    detail: 'Diffie-Hellman key agreement' },
+        { name: 'Derive encKey & macKey via HKDF-SHA256',           detail: 'AES-256-CTR encryption' },
+        { name: 'Generate tag T = HMAC-SHA256(macKey, salt ‖ C)',   detail: '256-bit authentication tag' },
+        { name: 'Membangun paket output (U ‖ salt ‖ C ‖ T)',        detail: 'Tulis ke encrypted_DHIES_file.bin' }
+      ],
+      DECRYPT: [
+        { name: 'Membaca paket ciphertext DHIES',                   detail: 'Memuat file .bin dari disk' },
+        { name: 'Parsing paket — ekstrak U, salt, C, T',            detail: 'Baca komponen paket' },
+        { name: 'Menghitung shared secret Z = DH(BobPrivKey, U)',   detail: 'DH key agreement' },
+        { name: 'Verifikasi HMAC-SHA256 & dekripsi AES-256-CTR',    detail: 'Autentikasi + dekripsi' },
+        { name: 'Menyimpan hasil dekripsi',                         detail: 'Tulis plaintext ke file output' }
+      ]
+    }
+  };
+
+  window.onload = function() {
+    setTimeout(function() {
+      if (!window.javaBridge) return;
+
+      const mode   = window.javaBridge.getMode();
+      const scheme = window.javaBridge.getScheme();
+
+      // Update sidebar info
+      document.getElementById('info-mode').textContent =
+        mode === 'DECRYPT' ? 'Dekripsi' : 'Enkripsi';
+
+      const isRsa = scheme === 'RSA_AES';
+      const schemeColor = isRsa ? 'var(--rsa-color)' : 'var(--dhies-color)';
+      const schemeDim   = isRsa ? 'var(--rsa-dim)'   : 'var(--dhies-dim)';
+      const schemeBorder= isRsa ? 'var(--rsa-border)' : 'var(--dhies-border)';
+      document.getElementById('info-scheme').innerHTML =
+        '<span style="font-family:var(--font-mono);font-size:12px;font-weight:600;' +
+        'padding:3px 10px;border-radius:999px;color:' + schemeColor +
+        ';background:' + schemeDim + ';border:1px solid ' + schemeBorder + ';">' +
+        (isRsa ? 'RSA-AES' : 'DHIES-AES') + '</span>';
+
+      // Page title
+      const modeLabel = mode === 'DECRYPT' ? 'Dekripsi' : 'Enkripsi';
+      const schemeLabel = isRsa ? 'RSA-AES' : 'DHIES-AES';
+      document.getElementById('page-title').textContent =
+        modeLabel + ' — ' + schemeLabel;
+      document.getElementById('page-subtitle').textContent =
+        'Proses sedang berjalan, mohon tunggu...';
+
+      // Build step list from definitions
+      const steps = (STEP_DEFS[scheme] || {})[mode] || [];
+      totalSteps = steps.length;
+      buildStepList(steps);
+      updateProgress(0, totalSteps);
+
+      // Disable back button while process running
+      document.getElementById('btn-back').disabled = true;
+
+      // Start process
+      processStartTime = Date.now();
+      window.javaBridge.startProcess();
+
+    }, 200);
+  };
+
+  function buildStepList(steps) {
+    const list = document.getElementById('step-list');
+    list.innerHTML = '';
+    steps.forEach(function(step, i) {
+      if (i > 0) {
+        const conn = document.createElement('div');
+        conn.className = 'step-connector';
+        conn.id = 'connector-' + i;
+        list.appendChild(conn);
+      }
+      const el = document.createElement('div');
+      el.className = 'step-item waiting';
+      el.id = 'step-' + (i + 1);
+      el.innerHTML =
+        '<div class="step-bullet">' + (i + 1) + '</div>' +
+        '<div class="step-body">' +
+          '<div class="step-name">' + escapeHtml(step.name) + '</div>' +
+          '<div class="step-detail" id="detail-' + (i+1) + '">' + escapeHtml(step.detail) + '</div>' +
+        '</div>' +
+        '<div class="step-duration" id="dur-' + (i+1) + '">—</div>';
+      list.appendChild(el);
+    });
+  }
+
+  // Callback: step dimulai
+  function onStepStart(stepIndex, stepName) {
+    stepStartTimes[stepIndex] = Date.now();
+    const el = document.getElementById('step-' + stepIndex);
+    if (el) {
+      el.className = 'step-item running';
+      el.querySelector('.step-bullet').innerHTML =
+        '<div class="spinner" style="width:12px;height:12px;border-width:1.5px;"></div>';
+    }
+    // Update connector sebelumnya
+    const conn = document.getElementById('connector-' + stepIndex);
+    if (conn) conn.classList.add('done');
+
+    document.getElementById('current-step-label').textContent =
+      'Langkah ' + stepIndex + ': ' + stepName;
+    updateProgress(completedSteps, totalSteps);
+  }
+
+  // Callback: step selesai
+  function onStepDone(stepIndex, durationMs, info) {
+    completedSteps++;
+    const el = document.getElementById('step-' + stepIndex);
+    if (el) {
+      el.className = 'step-item done';
+      el.querySelector('.step-bullet').textContent = '✓';
+      const detailEl = document.getElementById('detail-' + stepIndex);
+      if (detailEl) detailEl.textContent = info;
+      const durEl = document.getElementById('dur-' + stepIndex);
+      if (durEl) durEl.textContent = formatDuration(durationMs);
+    }
+    updateProgress(completedSteps, totalSteps);
+  }
+
+  // Callback: semua selesai
+  function onProcessComplete(outputPath, durationMs, outputSizeBytes) {
+    processFinished = true;
+
+    document.getElementById('page-subtitle').textContent = 'Proses selesai';
+    document.getElementById('progress-fill').style.width = '100%';
+    document.getElementById('progress-fill').classList.add('success');
+    document.getElementById('progress-label').textContent = totalSteps + ' / ' + totalSteps + ' langkah';
+    document.getElementById('current-step-label').textContent = 'Semua langkah selesai';
+
+    // Timing & output info
+    document.getElementById('timing-card').style.display = 'block';
+    document.getElementById('info-timing').textContent = formatDuration(durationMs);
+    document.getElementById('output-size-card').style.display = 'block';
+    document.getElementById('info-output-size').textContent = formatSize(outputSizeBytes);
+
+    // Done banner
+    const banner = document.getElementById('done-banner');
+    banner.classList.add('show');
+    document.getElementById('done-detail').textContent =
+      'Total waktu: ' + formatDuration(durationMs) +
+      ' · Output: ' + formatSize(outputSizeBytes);
+
+    // Enable navigation
+    document.getElementById('btn-back').disabled = false;
+    document.getElementById('btn-next').disabled = false;
+    document.getElementById('status-text').textContent = 'Proses selesai — lihat hasil';
+  }
+
+  // Callback: error
+  function onProcessError(message) {
+    document.getElementById('page-subtitle').textContent = 'Proses gagal';
+    document.getElementById('error-banner').style.display = 'flex';
+    document.getElementById('error-banner').textContent = '✗ Error: ' + message;
+    document.getElementById('btn-back').disabled = false;
+    document.getElementById('status-text').textContent = 'Terjadi error';
+  }
+
+  function updateProgress(done, total) {
+    if (total === 0) return;
+    const pct = Math.round((done / total) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = done + ' / ' + total + ' langkah';
+  }
+
+  function goBack() {
+    if (!processFinished) return;
+    if (window.javaBridge) window.javaBridge.navigateTo('scheme.html');
+  }
+  function goNext() {
+    if (!processFinished) return;
+    if (window.javaBridge) window.javaBridge.navigateTo('result.html');
+  }
+
+  function formatDuration(ms) {
+    if (ms < 1000) return ms + ' ms';
+    if (ms < 60000) return (ms / 1000).toFixed(2) + ' detik';
+    const m = Math.floor(ms / 60000);
+    const s = ((ms % 60000) / 1000).toFixed(1);
+    return m + ' mnt ' + s + ' dtk';
+  }
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+    if (bytes < 1073741824) return (bytes/1048576).toFixed(1) + ' MB';
+    return (bytes/1073741824).toFixed(2) + ' GB';
+  }
+  function escapeHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>

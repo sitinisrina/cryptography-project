@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>CryptoDemo — Preview</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .preview-layout {
+      display: grid;
+      grid-template-columns: 1fr 260px;
+      gap: 16px;
+      align-items: start;
+    }
+    .preview-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+    }
+    .preview-panel-header {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-elevated);
+    }
+    .preview-panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .preview-panel-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      position: relative;
+      min-height: 240px;
+    }
+    .pdf-preview-img {
+      max-width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+    }
+    .video-thumb-wrap { position: relative; display: inline-block; }
+    .video-thumb-img {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: var(--radius-md);
+      object-fit: cover;
+      display: block;
+    }
+    .video-play-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.35);
+      border-radius: var(--radius-md);
+    }
+    .video-play-icon {
+      width: 52px; height: 52px;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(4px);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .video-play-icon svg { width: 22px; height: 22px; color: #fff; margin-left: 3px; }
+    .video-duration-badge {
+      position: absolute; bottom: 10px; right: 10px;
+      background: rgba(0,0,0,0.65); color: #fff;
+      font-family: var(--font-mono); font-size: 11px;
+      padding: 3px 8px; border-radius: 4px;
+    }
+    .img-preview { max-width: 100%; max-height: 320px; object-fit: contain; border-radius: var(--radius-sm); }
+    .text-preview {
+      width: 100%; font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-secondary); line-height: 1.8;
+      white-space: pre-wrap; word-break: break-all;
+      text-align: left; max-height: 300px; overflow-y: auto;
+    }
+    .generic-preview { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .generic-icon { font-size: 56px; line-height: 1; }
+    .generic-label { font-size: 13px; color: var(--text-secondary); }
+    .preview-loading { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text-muted); font-size: 13px; }
+    .meta-sidebar { display: flex; flex-direction: column; gap: 8px; }
+    .hash-computing {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .hash-result-box {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .hash-result-value {
+      font-family: var(--font-mono); font-size: 10px;
+      color: var(--accent); word-break: break-all; line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- STEPPER -->
+  <nav class="stepper">
+    <div class="stepper-item done">
+      <div class="stepper-node">
+        <div class="stepper-circle">✓</div>
+        <span class="stepper-label">File & Mode</span>
+      </div>
+    </div>
+    <div class="stepper-line" style="background:var(--success-border)"></div>
+    <div class="stepper-item active">
+      <div class="stepper-node">
+        <div class="stepper-circle">2</div>
+        <span class="stepper-label">Preview</span>
+      </div>
+    </div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item"><div class="stepper-node"><div class="stepper-circle">3</div><span class="stepper-label">Skema</span></div></div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item"><div class="stepper-node"><div class="stepper-circle">4</div><span class="stepper-label">Proses</span></div></div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item"><div class="stepper-node"><div class="stepper-circle">5</div><span class="stepper-label">Hasil</span></div></div>
+  </nav>
+
+  <!-- CONTENT -->
+  <div class="content" style="padding:16px 48px; gap:14px; flex:1; overflow-y:auto;">
+
+    <div class="page-header animate-in" style="margin-bottom:0">
+      <div class="page-title">Preview File</div>
+      <div class="page-subtitle" id="page-subtitle">Memuat informasi file...</div>
+    </div>
+
+    <div class="preview-layout animate-in">
+
+      <!-- Kiri: Preview + Hash -->
+      <div style="display:flex; flex-direction:column; gap:12px;">
+
+        <div class="preview-panel">
+          <div class="preview-panel-header">
+            <div class="preview-panel-title" id="preview-panel-title">Preview</div>
+            <div id="preview-badge" style="margin-left:auto;"></div>
+          </div>
+          <div class="preview-panel-body" id="preview-body">
+            <div class="preview-loading">
+              <div class="spinner"></div>
+              <span>Memuat preview...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hash SHA-256 -->
+        <div class="hash-computing">
+          <div class="section-title">Hash SHA-256 — Plaintext</div>
+          <div id="hash-progress-wrap">
+            <div class="progress-wrap">
+              <div class="progress-meta">
+                <span id="hash-progress-label">Menghitung hash...</span>
+                <span id="hash-percent">0%</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="hash-bar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+          <div id="hash-result-wrap" style="display:none;">
+            <div class="hash-result-box">
+              <div style="font-size:16px; flex-shrink:0; margin-top:1px;">🔐</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px;">SHA-256</div>
+                <div class="hash-result-value" id="hash-value">—</div>
+              </div>
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:6px; display:flex; align-items:center; gap:6px;">
+              <span style="color:var(--success)">✓</span>
+              Hash disimpan — akan dibandingkan dengan hasil dekripsi di Layar 5
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Kanan: Metadata -->
+      <div class="meta-sidebar">
+        <div class="section-title" style="margin-bottom:0">Informasi File</div>
+        <div class="card-sm animate-in"><div class="card-label">Nama File</div><div class="card-value" id="meta-name" style="word-break:break-all;">—</div></div>
+        <div class="card-sm animate-in"><div class="card-label">Ukuran</div><div class="card-value" id="meta-size">—</div></div>
+        <div class="card-sm animate-in"><div class="card-label">Tipe File</div><div class="card-value" id="meta-type">—</div></div>
+        <div class="card-sm animate-in" id="meta-pages-card" style="display:none;"><div class="card-label">Jumlah Halaman</div><div class="card-value" id="meta-pages">—</div></div>
+        <div class="card-sm animate-in" id="meta-duration-card" style="display:none;"><div class="card-label">Durasi</div><div class="card-value" id="meta-duration">—</div></div>
+        <div class="card-sm animate-in"><div class="card-label">Mode</div><div class="card-value" id="meta-mode">—</div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar animate-in">
+    <button class="btn btn-ghost" onclick="goBack()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      Kembali
+    </button>
+    <div class="bottom-bar-right">
+      <span style="font-size:12px; color:var(--text-muted);" id="status-text">Menghitung hash...</span>
+      <button class="btn btn-primary" id="btn-next" disabled onclick="goNext()">
+        Pilih Skema
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+<script>
+  let fileExt = '';
+  let hashDone = false;
+
+  window.onload = function() {
+    setTimeout(function() {
+      if (window.javaBridge) window.javaBridge.getFileMetadata();
+    }, 150);
+  };
+
+  function onFileMetadata(filePath, fileName, fileSizeBytes, fileExtension) {
+    fileExt = fileExtension.toLowerCase();
+    document.getElementById('meta-name').textContent = fileName;
+    document.getElementById('meta-size').textContent = formatSize(fileSizeBytes);
+    document.getElementById('meta-type').textContent = getFileTypeLabel(fileExt);
+    document.getElementById('meta-mode').textContent = window.javaBridge ? window.javaBridge.getMode() : '—';
+    document.getElementById('page-subtitle').textContent = fileName;
+    loadPreview(fileExt);
+    if (window.javaBridge) window.javaBridge.computeHash();
+  }
+
+  function loadPreview(ext) {
+    const title = document.getElementById('preview-panel-title');
+    if (ext === 'pdf') {
+      title.textContent = 'Halaman Pertama PDF';
+      setBadge('PDF', 'var(--danger)', 'var(--danger-dim)');
+      window.javaBridge.getPdfPreview();
+      window.javaBridge.getPdfPageCount();
+    } else if (['mp4','mov','avi','mkv'].includes(ext)) {
+      title.textContent = 'Thumbnail Video';
+      setBadge('VIDEO', '#a855f7', 'rgba(168,85,247,0.12)');
+      window.javaBridge.getVideoThumbnail(); // akan trigger onVideoMetadata
+    } else if (['png','jpg','jpeg','gif','webp','bmp'].includes(ext)) {
+      title.textContent = 'Preview Gambar';
+      setBadge('IMAGE', 'var(--dhies-color)', 'var(--dhies-dim)');
+      window.javaBridge.getImagePreview();
+    } else if (['txt','md','csv','json','xml','log'].includes(ext)) {
+      title.textContent = 'Isi File (500 karakter)';
+      setBadge('TEXT', 'var(--warning)', 'var(--warning-dim)');
+      window.javaBridge.getTextPreview();
+    } else if (ext === 'bin') {
+      title.textContent = 'Hex Dump (64 byte pertama)';
+      setBadge('BIN', 'var(--rsa-color)', 'var(--rsa-dim)');
+      showGenericPreview('🔒', 'File ciphertext (.bin) — enkripsi dulu untuk melihat hex dump');
+    } else {
+      title.textContent = 'Preview tidak tersedia';
+      setBadge(ext.toUpperCase() || 'FILE', 'var(--text-muted)', 'var(--bg-elevated)');
+      showGenericPreview(getFileIcon(ext), 'Format tidak mendukung preview');
+    }
+  }
+
+  function onPdfPreview(base64DataUrl) {
+    document.getElementById('preview-body').innerHTML =
+      '<img class="pdf-preview-img" src="' + base64DataUrl + '" alt="Preview PDF">';
+  }
+  function onPdfPageCount(count) {
+    if (count > 0) {
+      document.getElementById('meta-pages-card').style.display = 'block';
+      document.getElementById('meta-pages').textContent = count + ' halaman';
+    }
+  }
+  function onVideoThumbnail(base64DataUrl, durationSeconds) {
+    // Fallback jika thumbnail berhasil (tidak digunakan saat ini)
+    onVideoMetadata(durationSeconds);
+  }
+
+  function onVideoMetadata(durationSeconds) {
+    const durStr = formatDuration(durationSeconds);
+    if (durationSeconds > 0) {
+      document.getElementById('meta-duration-card').style.display = 'block';
+      document.getElementById('meta-duration').textContent = durStr;
+    }
+    // Tampilkan preview video keren dengan warna dan ikon
+    document.getElementById('preview-body').innerHTML =
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px;">' +
+        '<div style="width:120px;height:120px;border-radius:50%;background:rgba(168,85,247,0.12);' +
+             'border:2px solid rgba(168,85,247,0.35);display:flex;align-items:center;justify-content:center;">' +
+          '<svg width="48" height="48" viewBox="0 0 24 24" fill="rgba(168,85,247,0.9)">' +
+            '<path d="M8 5v14l11-7z"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div style="text-align:center;">' +
+          '<div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">' + escapeHtml(document.getElementById('meta-name').textContent) + '</div>' +
+          (durationSeconds > 0 ? '<div style="font-family:var(--font-mono);font-size:13px;color:rgba(168,85,247,0.9);">⏱ ' + durStr + '</div>' : '') +
+          '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Video MP4</div>' +
+        '</div>' +
+      '</div>';
+  }
+  function onImagePreview(base64DataUrl) {
+    document.getElementById('preview-body').innerHTML =
+      '<img class="img-preview" src="' + base64DataUrl + '" alt="Preview">';
+  }
+  function onTextPreview(text) {
+    document.getElementById('preview-body').innerHTML =
+      '<pre class="text-preview">' + escapeHtml(text) + '</pre>';
+  }
+  function onPreviewError(message) {
+    showGenericPreview('⚠️', 'Gagal memuat preview: ' + message);
+  }
+
+  function onHashProgress(percent) {
+    document.getElementById('hash-bar').style.width = percent + '%';
+    document.getElementById('hash-percent').textContent = percent + '%';
+    document.getElementById('hash-progress-label').textContent = 'Menghitung hash... ' + percent + '%';
+  }
+  function onHashComplete(hashHex) {
+    hashDone = true;
+    document.getElementById('hash-progress-wrap').style.display = 'none';
+    document.getElementById('hash-result-wrap').style.display = 'block';
+    document.getElementById('hash-value').textContent = hashHex;
+    document.getElementById('btn-next').disabled = false;
+    document.getElementById('status-text').textContent = 'Hash selesai — siap dilanjutkan';
+    document.getElementById('hash-bar').classList.add('success');
+  }
+  function onHashError(message) {
+    document.getElementById('hash-progress-label').textContent = '⚠ ' + message;
+  }
+
+  function goBack() { if (window.javaBridge) window.javaBridge.navigateTo('dashboard.html'); }
+  function goNext() { if (hashDone && window.javaBridge) window.javaBridge.navigateTo('scheme.html'); }
+
+  function showGenericPreview(icon, label) {
+    document.getElementById('preview-body').innerHTML =
+      '<div class="generic-preview"><div class="generic-icon">' + icon + '</div>' +
+      '<div class="generic-label">' + escapeHtml(label) + '</div></div>';
+  }
+  function setBadge(text, color, bg) {
+    document.getElementById('preview-badge').innerHTML =
+      '<span style="font-size:10px;font-weight:600;font-family:var(--font-mono);padding:2px 8px;border-radius:999px;color:' + color + ';background:' + bg + ';border:1px solid ' + color + '33;letter-spacing:0.05em;">' + text + '</span>';
+  }
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+    if (bytes < 1073741824) return (bytes/1048576).toFixed(1) + ' MB';
+    return (bytes/1073741824).toFixed(2) + ' GB';
+  }
+  function formatDuration(sec) {
+    if (!sec || sec <= 0) return '—';
+    const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+    if (h > 0) return h+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    return m+':'+String(s).padStart(2,'0');
+  }
+  function getFileTypeLabel(ext) {
+    const map = { pdf:'PDF Document', mp4:'Video MP4', mov:'Video MOV', avi:'Video AVI',
+      png:'Gambar PNG', jpg:'Gambar JPEG', jpeg:'Gambar JPEG', gif:'Gambar GIF',
+      txt:'File Teks', md:'Markdown', csv:'CSV', json:'JSON', bin:'Binary / Ciphertext' };
+    return map[ext] || ext.toUpperCase() + ' File';
+  }
+  function getFileIcon(ext) {
+    const icons = { mp4:'🎬',mov:'🎬',avi:'🎬',mkv:'🎬',pdf:'📄',txt:'📝',md:'📝',
+      csv:'📊',json:'📋',png:'🖼',jpg:'🖼',jpeg:'🖼',gif:'🖼',bin:'🔒',zip:'📦' };
+    return icons[ext] || '📁';
+  }
+  function escapeHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
