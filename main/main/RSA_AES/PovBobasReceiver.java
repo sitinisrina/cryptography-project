@@ -3,6 +3,13 @@ package main.RSA_AES;
 import main.BenchmarkHelper;
 import main.Helper;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Scanner;
 
@@ -46,15 +53,21 @@ public class PovBobasReceiver {
         return new byte[][] { encryptedSessionKey, encryptedFileContent };
     }
 
-    public static byte[] decryptMode(byte[] encryptedPackage) throws Exception {
+    public static void decryptFileFromInput(String inputPath, String outputPath) throws Exception {
         var bobPrivateKey = Helper.loadPrivateKey("bob_rsa_private_key.bin", "RSA");
 
-        byte[][] parsed = parseEncryptedPackage(encryptedPackage);
-        byte[] encryptedSessionKey = parsed[0];
-        byte[] encryptedFileContent = parsed[1];
+        DataInputStream dis = new DataInputStream(
+            new BufferedInputStream(new FileInputStream(inputPath)));
+        int encKeyLen = dis.readInt();
+        byte[] encryptedSessionKey = new byte[encKeyLen];
+        dis.readFully(encryptedSessionKey);
 
         var sessionKey = HybridRSA_AES.decryptSessionKey(encryptedSessionKey, bobPrivateKey);
-        return HybridRSA_AES.decryptMessage(encryptedFileContent, sessionKey);
+        try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(outputPath))) {
+            AES.decryptFromStream(dis, bos, sessionKey);
+        } finally {
+            dis.close();
+        }
     }
 
     public static void main(String[] args) {
@@ -64,16 +77,28 @@ public class PovBobasReceiver {
             System.out.print("Masukkan path file encrypted package: ");
             String encryptedPackagePath = scanner.nextLine();
 
-            byte[] encryptedPackage = Helper.fromFiletoBinary(encryptedPackagePath);
-            final byte[][] holder = new byte[1][];
+            // Load package and parse header outside the benchmark so timing reflects pure crypto only
+            byte[] encPackage = Helper.fromFiletoBinary(encryptedPackagePath);
+            var bobPrivateKey = Helper.loadPrivateKey("bob_rsa_private_key.bin", "RSA");
 
+            DataInputStream headerDis = new DataInputStream(new ByteArrayInputStream(encPackage));
+            int encKeyLen = headerDis.readInt();
+            byte[] encryptedSessionKey = new byte[encKeyLen];
+            headerDis.readFully(encryptedSessionKey);
+            var sessionKey = HybridRSA_AES.decryptSessionKey(encryptedSessionKey, bobPrivateKey);
+            // headerDis now positioned at IV — remaining bytes = IV + ciphertext + tag
+            byte[] remaining = encPackage;
+            int offset = Integer.BYTES + encKeyLen;
+
+            ByteArrayOutputStream resultBaos = new ByteArrayOutputStream();
             BenchmarkHelper.BenchmarkResult benchmarkResult = BenchmarkHelper.measure(() -> {
-                holder[0] = decryptMode(encryptedPackage);
+                AES.decryptFromStream(
+                    new ByteArrayInputStream(remaining, offset, remaining.length - offset),
+                    resultBaos, sessionKey);
             });
 
-            byte[] decryptedMessage = holder[0];
+            byte[] decryptedMessage = resultBaos.toByteArray();
             String decryptedHash = Helper.sha256(decryptedMessage);
-
             Helper.writeBinarytoFile(decryptedMessage, "decrypted_message.mp4");
 
             BenchmarkHelper.writeBenchmarkResult(

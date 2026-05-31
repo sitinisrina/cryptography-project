@@ -51,13 +51,13 @@
 
     <!-- Header -->
     <div class="page-header animate-in" style="margin-bottom:0">
-      <div class="page-title">Selamat datang di CryptoDemo</div>
-      <div class="page-subtitle">Demonstrasi enkripsi dan dekripsi file menggunakan skema kriptografi hibrida</div>
+      <div class="page-title">Tugas Akhir: Kriptografi</div>
+      <div class="page-subtitle">Demonstrasi enkripsi dan dekripsi file menggunakan skema kriptografi two-tier</div>
     </div>
 
     <!-- Mode Toggle -->
     <div class="animate-in" style="display:flex; flex-direction:column; gap:8px;">
-      <div class="section-title">Mode Operasi</div>
+      <div class="section-title">Pilih Mode Operasi:</div>
       <div class="mode-toggle">
         <button class="mode-btn active" id="btn-encrypt" onclick="setMode('ENCRYPT')">
           Enkripsi
@@ -70,7 +70,7 @@
 
     <!-- Drop Zone -->
     <div class="animate-in" style="display:flex; flex-direction:column; gap:8px;">
-      <div class="section-title" id="file-section-label">File Plaintext</div>
+      <div class="section-title" id="file-section-label">Masukkan File Plaintext:</div>
 
       <div class="drop-zone" id="drop-zone" onclick="triggerFilePicker()">
         <div class="drop-icon">
@@ -236,10 +236,12 @@
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // ---- Inisialisasi: set default mode ke Java ----
+  // ---- Inisialisasi: reset sesi sebelumnya dan set default mode ----
   window.onload = function() {
     setTimeout(function() {
-      if (window.javaBridge) window.javaBridge.setMode('ENCRYPT');
+      if (!window.javaBridge) return;
+      window.javaBridge.resetSession();
+      window.javaBridge.setMode('ENCRYPT');
     }, 200);
   };
 </script>

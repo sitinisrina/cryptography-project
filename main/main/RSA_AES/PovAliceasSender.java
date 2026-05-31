@@ -3,6 +3,13 @@ package main.RSA_AES;
 import main.BenchmarkHelper;
 import main.Helper;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Scanner;
 
@@ -26,14 +33,19 @@ public class PovAliceasSender {
         return buffer.array();
     }
 
-    public static byte[] encryptMode(byte[] fileContent) throws Exception {
+    public static void encryptFileToOutput(String inputPath, String outputPath) throws Exception {
         var bobPublicKey = Helper.loadPublicKey("bob_rsa_public_key.bin", "RSA");
-
         var sessionKey = HybridRSA_AES.generateSessionKey();
         var encryptedSessionKey = HybridRSA_AES.encryptSessionKey(sessionKey, bobPublicKey);
-        var encryptedFileContent = HybridRSA_AES.encryptMessage(fileContent, sessionKey);
 
-        return buildEncryptedPackage(encryptedSessionKey, encryptedFileContent);
+        try (DataOutputStream dos = new DataOutputStream(
+                 new BufferedOutputStream(new FileOutputStream(outputPath)));
+             BufferedInputStream bis = new BufferedInputStream(new FileInputStream(inputPath))) {
+            dos.writeInt(encryptedSessionKey.length);
+            dos.write(encryptedSessionKey);
+            dos.flush();
+            AES.encryptToStream(bis, dos, sessionKey);
+        }
     }
 
     public static void main(String[] args) {
@@ -43,17 +55,26 @@ public class PovAliceasSender {
             System.out.print("Masukkan path file yang ingin dikirim: ");
             String filePath = scanner.nextLine();
 
+            // Load file and generate keys outside the benchmark so timing reflects pure crypto only
             byte[] fileContent = Helper.fromFiletoBinary(filePath);
             String originalHash = Helper.sha256(fileContent);
-            final byte[][] holder = new byte[1][];
 
+            var bobPublicKey = Helper.loadPublicKey("bob_rsa_public_key.bin", "RSA");
+            var sessionKey = HybridRSA_AES.generateSessionKey();
+            var encryptedSessionKey = HybridRSA_AES.encryptSessionKey(sessionKey, bobPublicKey);
+
+            ByteArrayOutputStream resultBaos = new ByteArrayOutputStream();
             BenchmarkHelper.BenchmarkResult benchmarkResult = BenchmarkHelper.measure(() -> {
-                holder[0] = encryptMode(fileContent);
+                DataOutputStream dos = new DataOutputStream(resultBaos);
+                dos.writeInt(encryptedSessionKey.length);
+                dos.write(encryptedSessionKey);
+                dos.flush();
+                AES.encryptToStream(new ByteArrayInputStream(fileContent), dos, sessionKey);
             });
 
-            byte[] encryptedPackage = holder[0];
+            Helper.writeBinarytoFile(resultBaos.toByteArray(), "encrypted_rsa_aes_package.bin");
+
             // String ciphertextPackageHash = Helper.sha256(encryptedPackage);
-            Helper.writeBinarytoFile(encryptedPackage, "encrypted_rsa_aes_package.bin");
 
             System.out.println("Hash SHA-256 file asli          : " + originalHash);
             // System.out.println("Hash SHA-256 paket ciphertext   : " + ciphertextPackageHash);

@@ -163,8 +163,8 @@
           </div>
         </div>
 
-        <!-- Hash SHA-256 -->
-        <div class="hash-computing">
+        <!-- Hash SHA-256 (only shown in ENCRYPT mode) -->
+        <div class="hash-computing" id="hash-section">
           <div class="section-title">Hash SHA-256 — Plaintext</div>
           <div id="hash-progress-wrap">
             <div class="progress-wrap">
@@ -187,7 +187,7 @@
             </div>
             <div style="font-size:11px; color:var(--text-muted); margin-top:6px; display:flex; align-items:center; gap:6px;">
               <span style="color:var(--success)">✓</span>
-              Hash disimpan — akan dibandingkan dengan hasil dekripsi di Layar 5
+              Hash berhasil disimpan di database! 
             </div>
           </div>
         </div>
@@ -239,16 +239,24 @@
     document.getElementById('meta-name').textContent = fileName;
     document.getElementById('meta-size').textContent = formatSize(fileSizeBytes);
     document.getElementById('meta-type').textContent = getFileTypeLabel(fileExt);
-    document.getElementById('meta-mode').textContent = window.javaBridge ? window.javaBridge.getMode() : '—';
+    const mode = window.javaBridge ? window.javaBridge.getMode() : '';
+    document.getElementById('meta-mode').textContent = mode || '—';
     document.getElementById('page-subtitle').textContent = fileName;
     loadPreview(fileExt);
-    if (window.javaBridge) window.javaBridge.computeHash();
+    if (mode === 'DECRYPT') {
+      document.getElementById('hash-section').style.display = 'none';
+      hashDone = true;
+      document.getElementById('btn-next').disabled = false;
+      document.getElementById('status-text').textContent = 'Siap dilanjutkan';
+    } else {
+      if (window.javaBridge) window.javaBridge.computeHash();
+    }
   }
 
   function loadPreview(ext) {
     const title = document.getElementById('preview-panel-title');
     if (ext === 'pdf') {
-      title.textContent = 'Halaman Pertama PDF';
+      title.textContent = 'Preview Halaman Pertama PDF';
       setBadge('PDF', 'var(--danger)', 'var(--danger-dim)');
       window.javaBridge.getPdfPreview();
       window.javaBridge.getPdfPageCount();
@@ -261,7 +269,7 @@
       setBadge('IMAGE', 'var(--dhies-color)', 'var(--dhies-dim)');
       window.javaBridge.getImagePreview();
     } else if (['txt','md','csv','json','xml','log'].includes(ext)) {
-      title.textContent = 'Isi File (500 karakter)';
+      title.textContent = 'Preview Isi File';
       setBadge('TEXT', 'var(--warning)', 'var(--warning-dim)');
       window.javaBridge.getTextPreview();
     } else if (ext === 'bin') {

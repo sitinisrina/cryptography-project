@@ -76,6 +76,16 @@
         <sourceDirectory>main</sourceDirectory>
         <testSourceDirectory>test</testSourceDirectory>
 
+        <!-- Salin resource non-Java (HTML, CSS, JS) dari folder sumber -->
+        <resources>
+            <resource>
+                <directory>main</directory>
+                <excludes>
+                    <exclude>**/*.java</exclude>
+                </excludes>
+            </resource>
+        </resources>
+
         <plugins>
 
             <!-- Plugin unit test — tidak diubah -->

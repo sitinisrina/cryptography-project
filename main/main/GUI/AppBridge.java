@@ -13,9 +13,14 @@ import main.DHIES_AES.DHIESAliceasSender;
 import main.DHIES_AES.DHIESBobasReceiver;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.PrivateKey;
@@ -48,10 +53,11 @@ public class AppBridge {
 
     // State sesi — disimpan antar layar
     private File selectedFile;
-    private String operationMode;   // "ENCRYPT" atau "DECRYPT"
-    private String selectedScheme;  // "RSA_AES" atau "DHIES_AES"
-    private String plaintextHash;   // SHA-256 hash dari plaintext asli
-    private File outputFile;        // File hasil enkripsi/dekripsi
+    private String operationMode;      // "ENCRYPT" atau "DECRYPT"
+    private String selectedScheme;     // "RSA_AES" atau "DHIES_AES"
+    private String plaintextHash;      // SHA-256 hash dari plaintext asli (hex)
+    private String decryptedFileHash;  // SHA-256 hash dari hasil dekripsi (hex)
+    private File outputFile;           // File hasil enkripsi/dekripsi
 
     // Working directory — root project (tempat file kunci berada)
     private final String workingDir = System.getProperty("user.dir");
@@ -108,9 +114,9 @@ public class AppBridge {
 
             File file = chooser.showOpenDialog(stage);
             if (file != null) {
-                long maxSize = 1L * 1024 * 1024 * 1024; // 1 GB
+                long maxSize = 2L * 1024 * 1024 * 1024; // 2 GB
                 if (file.length() > maxSize) {
-                    runJS("onFileError('Ukuran file melebihi batas 1 GB.')");
+                    runJS("onFileError('Ukuran file melebihi batas 2 GB.')");
                     return;
                 }
                 selectedFile = file;
@@ -461,164 +467,252 @@ public class AppBridge {
     }
 
     private void runEncrypt() throws Exception {
-        long startTotal = System.currentTimeMillis();
+        long startTotal = System.nanoTime();
 
         if ("RSA_AES".equals(selectedScheme)) {
 
-            notifyStepStart(1, "Membaca file plaintext");
-            long t1 = System.currentTimeMillis();
-            byte[] fileContent = Helper.fromFiletoBinary(selectedFile.getAbsolutePath());
-            notifyStepDone(1, System.currentTimeMillis() - t1, formatSize(fileContent.length) + " dibaca");
+            // Step 1: ensure plaintext hash is available (use pre-computed or compute now)
+            notifyStepStart(1, "Menghitung hash SHA-256 plaintext");
+            long t1 = System.nanoTime();
+            if (plaintextHash == null || plaintextHash.isEmpty()) {
+                plaintextHash = Helper.sha256HashFile(selectedFile.getAbsolutePath());
+            }
+            byte[] hashBytes = Helper.fromHexaToBinary(plaintextHash);
+            notifyStepDone(1, System.nanoTime() - t1, plaintextHash.substring(0, 16) + "...");
 
             notifyStepStart(2, "Membangkitkan session key AES-256");
-            long t2 = System.currentTimeMillis();
+            long t2 = System.nanoTime();
             var sessionKey = main.RSA_AES.HybridRSA_AES.generateSessionKey();
-            notifyStepDone(2, System.currentTimeMillis() - t2, "256-bit key dibangkitkan");
+            notifyStepDone(2, System.nanoTime() - t2, "256-bit key dibangkitkan");
 
-            notifyStepStart(3, "Enkripsi data → AES-256-GCM");
-            long t3 = System.currentTimeMillis();
-            byte[] encContent = main.RSA_AES.HybridRSA_AES.encryptMessage(fileContent, sessionKey);
-            notifyStepDone(3, System.currentTimeMillis() - t3, formatSize(encContent.length) + " ciphertext");
-
-            notifyStepStart(4, "Enkripsi session key → RSA-OAEP-SHA256");
-            long t4 = System.currentTimeMillis();
+            notifyStepStart(3, "Enkripsi session key → RSA-OAEP-SHA256");
+            long t3 = System.nanoTime();
             PublicKey bobPubKey = Helper.loadPublicKey(
                 new File(workingDir, "bob_rsa_public_key.bin").getAbsolutePath(), "RSA");
             byte[] encKey = main.RSA_AES.HybridRSA_AES.encryptSessionKey(sessionKey, bobPubKey);
-            notifyStepDone(4, System.currentTimeMillis() - t4, encKey.length + " byte encrypted key");
+            notifyStepDone(3, System.nanoTime() - t3, encKey.length + " byte encrypted key");
 
-            notifyStepStart(5, "Membangun paket output & menyimpan file");
-            long t5 = System.currentTimeMillis();
-            byte[] pkg = PovAliceasSender.buildEncryptedPackage(encKey, encContent);
+            // Step 4: write [hash 32B][encKeyLen 4B][encKey][IV+ciphertext+GCM tag]
+            notifyStepStart(4, "Sisipkan hash & enkripsi data → AES-256-GCM (streaming)");
+            long t4 = System.nanoTime();
             String outPath = new File(workingDir, "encrypted_rsa_aes_package.bin").getAbsolutePath();
-            Helper.writeBinarytoFile(pkg, outPath);
+            try (DataOutputStream dos = new DataOutputStream(
+                     new BufferedOutputStream(new FileOutputStream(outPath)));
+                 BufferedInputStream bis = new BufferedInputStream(
+                     new FileInputStream(selectedFile))) {
+                dos.write(hashBytes);        // 32 bytes: SHA-256 of plaintext
+                dos.writeInt(encKey.length);
+                dos.write(encKey);
+                dos.flush();
+                main.RSA_AES.AES.encryptToStream(bis, dos, sessionKey);
+            }
             outputFile = new File(outPath);
-            notifyStepDone(5, System.currentTimeMillis() - t5, formatSize(pkg.length) + " disimpan");
+            notifyStepDone(4, System.nanoTime() - t4, formatSize(outputFile.length()) + " paket tersimpan");
 
         } else { // DHIES_AES
 
-            notifyStepStart(1, "Membaca file plaintext");
-            long t1 = System.currentTimeMillis();
-            byte[] fileContent = Helper.fromFiletoBinary(selectedFile.getAbsolutePath());
-            notifyStepDone(1, System.currentTimeMillis() - t1, formatSize(fileContent.length) + " dibaca");
+            // Step 1: ensure plaintext hash is available
+            notifyStepStart(1, "Menghitung hash SHA-256 plaintext");
+            long t1 = System.nanoTime();
+            if (plaintextHash == null || plaintextHash.isEmpty()) {
+                plaintextHash = Helper.sha256HashFile(selectedFile.getAbsolutePath());
+            }
+            byte[] hashBytes = Helper.fromHexaToBinary(plaintextHash);
+            notifyStepDone(1, System.nanoTime() - t1, plaintextHash.substring(0, 16) + "...");
 
             notifyStepStart(2, "Memuat kunci publik DH Bob");
-            long t2 = System.currentTimeMillis();
+            long t2 = System.nanoTime();
             PublicKey bobPubKey = Helper.loadPublicKey(
                 new File(workingDir, "bob_DH_public_key.bin").getAbsolutePath(), "DH");
-            notifyStepDone(2, System.currentTimeMillis() - t2, "Kunci DH Bob dimuat");
+            notifyStepDone(2, System.nanoTime() - t2, "Kunci DH Bob dimuat");
 
-            notifyStepStart(3, "Membangkitkan kunci ephemeral Alice (u, U=g^u)");
-            long t3 = System.currentTimeMillis();
+            // Step 3: key gen + DH + HKDF merged — HKDF alone is sub-ms and would never
+            // render a visible spinner; grouping with DH (which takes visible time) avoids that.
+            notifyStepStart(3, "Membangkitkan kunci ephemeral, shared secret Z & derive keys");
+            long t3 = System.nanoTime();
             var aliceKP = main.DHIES_AES.DHIES.generateKeyPairFromPeerPublicKey(bobPubKey);
-            notifyStepDone(3, System.currentTimeMillis() - t3, "Kunci ephemeral siap");
-
-            notifyStepStart(4, "Menghitung shared secret Z = DH(u, BobPublicKey)");
-            long t4 = System.currentTimeMillis();
             byte[] sharedSecret = main.DHIES_AES.DHIES.computeSharedSecret(
                 aliceKP.getPrivate(), bobPubKey);
-            notifyStepDone(4, System.currentTimeMillis() - t4, sharedSecret.length + " byte");
+            byte[] salt = main.DHIES_AES.DHIES.generateRandomSalt();
+            var derivedKeys = main.DHIES_AES.DHIES.deriveKeys(sharedSecret, salt);
+            notifyStepDone(3, System.nanoTime() - t3, sharedSecret.length + " byte → encKey + macKey");
 
-            notifyStepStart(5, "Derive encKey & macKey via HKDF-SHA256, enkripsi AES-256-CTR");
-            long t5 = System.currentTimeMillis();
-            main.DHIES_AES.HybridDHIES_AES.HybridEncryptData result =
-                main.DHIES_AES.HybridDHIES_AES.encrypt(fileContent, sharedSecret);
-            notifyStepDone(5, System.currentTimeMillis() - t5,
-                formatSize(result.getCiphertext().length) + " ciphertext");
-
-            notifyStepStart(6, "Generate tag T = HMAC-SHA256(macKey, salt ‖ C)");
-            long t6 = System.currentTimeMillis();
-            notifyStepDone(6, System.currentTimeMillis() - t6,
-                result.getTag().length + " byte tag");
-
-            notifyStepStart(7, "Membangun paket output (U ‖ salt ‖ C ‖ T)");
-            long t7 = System.currentTimeMillis();
-            byte[] pkg = Helper.buildEncryptedPackage(
-                aliceKP.getPublic().getEncoded(),
-                result.getSalt(), result.getCiphertext(), result.getTag());
+            // Step 4: write [hash 32B][ephPubKey][salt][ivLen][IV+ciphertext][HMAC tag]
+            // hashBytes is included in HMAC(hash || salt || IV || ciphertext)
+            notifyStepStart(4, "Sisipkan hash & enkripsi AES-256-CTR + HMAC-SHA256 (streaming)");
+            long t4 = System.nanoTime();
+            byte[] ephPubKey = aliceKP.getPublic().getEncoded();
+            long ivAndCiphertextLen = main.DHIES_AES.AES_DHIES.IV_LENGTH + selectedFile.length();
             String outPath = new File(workingDir, "encrypted_DHIES_file.bin").getAbsolutePath();
-            Helper.writeBinarytoFile(pkg, outPath);
+            try (DataOutputStream dos = new DataOutputStream(
+                     new BufferedOutputStream(new FileOutputStream(outPath)));
+                 BufferedInputStream bis = new BufferedInputStream(new FileInputStream(selectedFile))) {
+                dos.write(hashBytes);          // 32 bytes: SHA-256 of plaintext
+                dos.writeInt(ephPubKey.length);
+                dos.write(ephPubKey);
+                dos.writeInt(salt.length);
+                dos.write(salt);
+                dos.writeLong(ivAndCiphertextLen);
+                byte[] tag = main.DHIES_AES.AES_DHIES.encryptToStreamWithMAC(
+                    bis, dos, derivedKeys.getEncKey(), derivedKeys.getMacKey(), salt, hashBytes);
+                dos.write(tag);
+            }
             outputFile = new File(outPath);
-            notifyStepDone(7, System.currentTimeMillis() - t7, formatSize(pkg.length) + " disimpan");
+            notifyStepDone(4, System.nanoTime() - t4,
+                formatSize(outputFile.length()) + " paket DHIES tersimpan");
         }
 
-        long totalMs = System.currentTimeMillis() - startTotal;
+        long totalMs = (System.nanoTime() - startTotal) / 1_000_000;
         runJS(String.format("onProcessComplete('%s', %d, %d)",
             escapeJS(outputFile.getAbsolutePath()), totalMs, outputFile.length()));
     }
 
     private void runDecrypt() throws Exception {
-        long startTotal = System.currentTimeMillis();
+        long startTotal = System.nanoTime();
 
         if ("RSA_AES".equals(selectedScheme)) {
 
-            notifyStepStart(1, "Membaca paket ciphertext");
-            long t1 = System.currentTimeMillis();
-            byte[] encPkg = Helper.fromFiletoBinary(selectedFile.getAbsolutePath());
-            notifyStepDone(1, System.currentTimeMillis() - t1, formatSize(encPkg.length) + " dibaca");
-
-            notifyStepStart(2, "Parsing paket — ekstrak Ck dan Cm");
-            long t2 = System.currentTimeMillis();
-            byte[][] parsed = PovBobasReceiver.parseEncryptedPackage(encPkg);
-            notifyStepDone(2, System.currentTimeMillis() - t2,
-                "Ck: " + parsed[0].length + " byte, Cm: " + formatSize(parsed[1].length));
-
-            notifyStepStart(3, "Dekripsi session key → RSA-OAEP-SHA256");
-            long t3 = System.currentTimeMillis();
+            // Step 1: read embedded hash (first 32 bytes) and load private key
+            notifyStepStart(1, "Membaca paket & ekstrak hash SHA-256 asli");
+            long t1 = System.nanoTime();
             PrivateKey bobPrivKey = Helper.loadPrivateKey(
                 new File(workingDir, "bob_rsa_private_key.bin").getAbsolutePath(), "RSA");
-            var sessionKey = main.RSA_AES.HybridRSA_AES.decryptSessionKey(parsed[0], bobPrivKey);
-            notifyStepDone(3, System.currentTimeMillis() - t3, "Session key dipulihkan");
+            DataInputStream headerDis = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(selectedFile)));
+            byte[] embeddedHash = new byte[32];
+            headerDis.readFully(embeddedHash);
+            plaintextHash = Helper.fromBinaryToHexa(embeddedHash);
+            notifyStepDone(1, System.nanoTime() - t1, "Hash asli: " + plaintextHash.substring(0, 16) + "...");
 
-            notifyStepStart(4, "Dekripsi data → AES-256-GCM + verifikasi auth tag");
-            long t4 = System.currentTimeMillis();
-            byte[] plaintext = main.RSA_AES.HybridRSA_AES.decryptMessage(parsed[1], sessionKey);
-            notifyStepDone(4, System.currentTimeMillis() - t4, formatSize(plaintext.length) + " plaintext");
+            notifyStepStart(2, "Parsing paket — ekstrak Ck");
+            long t2 = System.nanoTime();
+            int encKeyLen = headerDis.readInt();
+            byte[] encryptedSessionKey = new byte[encKeyLen];
+            headerDis.readFully(encryptedSessionKey);
+            notifyStepDone(2, System.nanoTime() - t2, "Ck: " + encKeyLen + " byte");
+
+            notifyStepStart(3, "Dekripsi session key → RSA-OAEP-SHA256");
+            long t3 = System.nanoTime();
+            var sessionKey = main.RSA_AES.HybridRSA_AES.decryptSessionKey(encryptedSessionKey, bobPrivKey);
+            notifyStepDone(3, System.nanoTime() - t3, "Session key dipulihkan");
+
+            notifyStepStart(4, "Dekripsi data → AES-256-GCM + verifikasi auth tag (streaming)");
+            long t4 = System.nanoTime();
+            String outPath = new File(workingDir, "decrypted_message.mp4").getAbsolutePath();
+            try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(outPath))) {
+                main.RSA_AES.AES.decryptFromStream(headerDis, bos, sessionKey);
+            } finally {
+                headerDis.close();
+            }
+            outputFile = new File(outPath);
+            notifyStepDone(4, System.nanoTime() - t4, formatSize(outputFile.length()) + " plaintext");
 
             notifyStepStart(5, "Menyimpan hasil dekripsi");
-            long t5 = System.currentTimeMillis();
-            String outPath = new File(workingDir, "decrypted_message.mp4").getAbsolutePath();
-            Helper.writeBinarytoFile(plaintext, outPath);
-            outputFile = new File(outPath);
-            notifyStepDone(5, System.currentTimeMillis() - t5, "File disimpan");
+            long t5 = System.nanoTime();
+            notifyStepDone(5, System.nanoTime() - t5, outputFile.getName());
+
+            // Step 6: compute SHA-256 of decrypted file and compare with embedded hash
+            notifyStepStart(6, "Verifikasi hash SHA-256 hasil dekripsi");
+            long t6 = System.nanoTime();
+            decryptedFileHash = Helper.sha256HashFile(outputFile.getAbsolutePath());
+            boolean match6 = decryptedFileHash.equalsIgnoreCase(plaintextHash);
+            notifyStepDone(6, System.nanoTime() - t6,
+                match6 ? "✓ Hash cocok — integritas terjaga" : "✗ Hash tidak cocok");
 
         } else { // DHIES_AES
 
-            notifyStepStart(1, "Membaca paket ciphertext DHIES");
-            long t1 = System.currentTimeMillis();
-            byte[] encPkg = Helper.fromFiletoBinary(selectedFile.getAbsolutePath());
-            notifyStepDone(1, System.currentTimeMillis() - t1, formatSize(encPkg.length) + " dibaca");
+            // Step 1: read embedded hash (first 32 bytes) + parse the rest of the header
+            notifyStepStart(1, "Membaca & parsing header paket DHIES");
+            long t1 = System.nanoTime();
+            byte[] embeddedHash = new byte[32];
+            byte[] ephPubKeyBytes;
+            byte[] salt;
+            long ivAndCiphertextLen;
+            int headerSize;
+            try (DataInputStream hdr = new DataInputStream(
+                    new BufferedInputStream(new FileInputStream(selectedFile)))) {
+                hdr.readFully(embeddedHash);          // 32 bytes: original plaintext hash
+                int ephPubKeyLen = hdr.readInt();
+                ephPubKeyBytes = new byte[ephPubKeyLen];
+                hdr.readFully(ephPubKeyBytes);
+                int saltLen = hdr.readInt();
+                salt = new byte[saltLen];
+                hdr.readFully(salt);
+                ivAndCiphertextLen = hdr.readLong();
+                headerSize = 32 + 4 + ephPubKeyLen + 4 + saltLen + 8;
+            }
+            plaintextHash = Helper.fromBinaryToHexa(embeddedHash);
+            notifyStepDone(1, System.nanoTime() - t1, "Hash asli: " + plaintextHash.substring(0, 16) + "...");
 
-            notifyStepStart(2, "Parsing paket — ekstrak U, salt, C, T");
-            long t2 = System.currentTimeMillis();
-            byte[][] parsed = Helper.parseDHIESPackage(encPkg);
-            notifyStepDone(2, System.currentTimeMillis() - t2,
-                "C: " + formatSize(parsed[2].length));
-
-            notifyStepStart(3, "Menghitung shared secret Z = DH(BobPrivKey, U)");
-            long t3 = System.currentTimeMillis();
+            notifyStepStart(2, "Memuat kunci privat DH Bob");
+            long t2 = System.nanoTime();
             PrivateKey bobPrivKey = Helper.loadPrivateKey(
                 new File(workingDir, "bob_DH_private_key.bin").getAbsolutePath(), "DH");
-            PublicKey aliceEphPub = Helper.loadPublicKeyFromBytes(parsed[0], "DH");
+            notifyStepDone(2, System.nanoTime() - t2, "Private key dimuat");
+
+            notifyStepStart(3, "Menghitung shared secret Z & derive keys (HKDF)");
+            long t3 = System.nanoTime();
+            PublicKey aliceEphPub = Helper.loadPublicKeyFromBytes(ephPubKeyBytes, "DH");
             byte[] sharedSecret = main.DHIES_AES.DHIES.computeSharedSecret(bobPrivKey, aliceEphPub);
-            notifyStepDone(3, System.currentTimeMillis() - t3, sharedSecret.length + " byte");
+            var derivedKeys = main.DHIES_AES.DHIES.deriveKeys(sharedSecret, salt);
+            notifyStepDone(3, System.nanoTime() - t3, sharedSecret.length + " byte → encKey + macKey");
 
-            notifyStepStart(4, "Verifikasi HMAC-SHA256 & dekripsi AES-256-CTR");
-            long t4 = System.currentTimeMillis();
-            main.DHIES_AES.HybridDHIES_AES.HybridEncryptData hybridData =
-                new main.DHIES_AES.HybridDHIES_AES.HybridEncryptData(parsed[1], parsed[2], parsed[3]);
-            byte[] plaintext = main.DHIES_AES.HybridDHIES_AES.decrypt(hybridData, sharedSecret);
-            notifyStepDone(4, System.currentTimeMillis() - t4, formatSize(plaintext.length) + " plaintext");
+            // Pass 1: verify HMAC(embeddedHash || salt || IV || ciphertext) before writing any output
+            notifyStepStart(4, "Verifikasi HMAC-SHA256 (streaming)");
+            long t4 = System.nanoTime();
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(derivedKeys.getMacKey());
+            mac.update(embeddedHash);   // must match what encryptToStreamWithMAC used during encryption
+            mac.update(salt);
+            try (DataInputStream verifyDis = new DataInputStream(
+                    new BufferedInputStream(new FileInputStream(selectedFile)))) {
+                main.DHIES_AES.AES_DHIES.readFully(verifyDis, new byte[headerSize]);
+                byte[] buf = new byte[8 * 1024 * 1024];
+                long remaining = ivAndCiphertextLen;
+                while (remaining > 0) {
+                    int toRead = (int) Math.min(buf.length, remaining);
+                    int n = verifyDis.read(buf, 0, toRead);
+                    if (n == -1) throw new RuntimeException("Stream berakhir sebelum waktunya.");
+                    mac.update(buf, 0, n);
+                    remaining -= n;
+                }
+                byte[] recalcTag = mac.doFinal();
+                byte[] expectedTag = new byte[main.DHIES_AES.AES_DHIES.HMAC_TAG_SIZE];
+                verifyDis.readFully(expectedTag);
+                if (!java.util.Arrays.equals(recalcTag, expectedTag)) {
+                    throw new SecurityException("Verifikasi MAC gagal. Ciphertext tidak valid atau telah dimodifikasi.");
+                }
+            }
+            notifyStepDone(4, System.nanoTime() - t4, "MAC valid");
 
-            notifyStepStart(5, "Menyimpan hasil dekripsi");
-            long t5 = System.currentTimeMillis();
+            // Pass 2: decrypt (MAC already verified — safe to write output)
+            notifyStepStart(5, "Dekripsi AES-256-CTR (streaming)");
+            long t5 = System.nanoTime();
             String outPath = new File(workingDir, "decrypted_DHIES_message.mp4").getAbsolutePath();
-            Helper.writeBinarytoFile(plaintext, outPath);
+            try (DataInputStream decryptDis = new DataInputStream(
+                     new BufferedInputStream(new FileInputStream(selectedFile)));
+                 BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(outPath))) {
+                main.DHIES_AES.AES_DHIES.readFully(decryptDis, new byte[headerSize]);
+                main.DHIES_AES.AES_DHIES.decryptFromStream(
+                    decryptDis, bos, derivedKeys.getEncKey(), ivAndCiphertextLen);
+            }
             outputFile = new File(outPath);
-            notifyStepDone(5, System.currentTimeMillis() - t5, "File disimpan");
+            notifyStepDone(5, System.nanoTime() - t5, formatSize(outputFile.length()) + " plaintext");
+
+            notifyStepStart(6, "Menyimpan hasil dekripsi");
+            long t6 = System.nanoTime();
+            notifyStepDone(6, System.nanoTime() - t6, outputFile.getName());
+
+            // Step 7: compute SHA-256 of decrypted file and compare with embedded hash
+            notifyStepStart(7, "Verifikasi hash SHA-256 hasil dekripsi");
+            long t7 = System.nanoTime();
+            decryptedFileHash = Helper.sha256HashFile(outputFile.getAbsolutePath());
+            boolean match7 = decryptedFileHash.equalsIgnoreCase(plaintextHash);
+            notifyStepDone(7, System.nanoTime() - t7,
+                match7 ? "✓ Hash cocok — integritas terjaga" : "✗ Hash tidak cocok");
         }
 
-        long totalMs = System.currentTimeMillis() - startTotal;
+        long totalMs = (System.nanoTime() - startTotal) / 1_000_000;
         runJS(String.format("onProcessComplete('%s', %d, %d)",
             escapeJS(outputFile.getAbsolutePath()), totalMs, outputFile.length()));
     }
@@ -697,15 +791,17 @@ public class AppBridge {
         new Thread(task).start();
     }
 
-    public String getPlaintextHash() { return plaintextHash != null ? plaintextHash : ""; }
-    public String getMode()          { return operationMode != null ? operationMode : ""; }
-    public String getScheme()        { return selectedScheme != null ? selectedScheme : ""; }
+    public String getPlaintextHash()    { return plaintextHash    != null ? plaintextHash    : ""; }
+    public String getDecryptedFileHash(){ return decryptedFileHash != null ? decryptedFileHash : ""; }
+    public String getMode()             { return operationMode    != null ? operationMode    : ""; }
+    public String getScheme()           { return selectedScheme   != null ? selectedScheme   : ""; }
 
     public void resetSession() {
         selectedFile = null;
         operationMode = null;
         selectedScheme = null;
         plaintextHash = null;
+        decryptedFileHash = null;
         outputFile = null;
     }
 
@@ -724,8 +820,10 @@ public class AppBridge {
         runJS(String.format("onStepStart(%d, '%s')", index, escapeJS(name)));
     }
 
-    private void notifyStepDone(int index, long durationMs, String info) {
-        runJS(String.format("onStepDone(%d, %d, '%s')", index, durationMs, escapeJS(info)));
+    /** durationNs is System.nanoTime() delta; converted to fractional ms for JS. */
+    private void notifyStepDone(int index, long durationNs, String info) {
+        double ms = durationNs / 1_000_000.0;
+        runJS(String.format(java.util.Locale.US, "onStepDone(%d, %.2f, '%s')", index, ms, escapeJS(info)));
     }
 
     private String getKeyFileName() {

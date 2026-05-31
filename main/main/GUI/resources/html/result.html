@@ -179,30 +179,33 @@
           </div>
           <div class="hash-compare-body">
 
-            <div class="hash-row" id="row-original" style="display:none;">
-              <div class="hash-label">Plaintext Asli</div>
-              <div class="hash-value" id="hash-original">—</div>
-              <div class="hash-badge pending" id="badge-original">SHA-256</div>
-            </div>
-
-            <div class="hash-row" id="row-decrypted" style="display:none;">
-              <div class="hash-label">Hasil Dekripsi</div>
-              <div class="hash-value" id="hash-decrypted">—</div>
-              <div class="hash-badge pending" id="badge-decrypted">
-                <div class="spinner" style="width:10px;height:10px;border-width:1.5px;"></div>
+            <!-- Encrypt mode: show embedded hash + note -->
+            <div id="encrypt-hash-section" style="display:none;">
+              <div class="hash-row">
+                <div class="hash-label">Hash Plaintext (tersimpan dalam paket)</div>
+                <div class="hash-value" id="hash-embedded-encrypt">—</div>
+                <div class="hash-badge match" id="badge-embedded">SHA-256</div>
+              </div>
+              <div style="font-size:12px; color:var(--text-muted); padding:8px 4px; line-height:1.7;">
+                Hash ini disisipkan ke dalam file ciphertext dan akan diekstrak otomatis saat dekripsi untuk memverifikasi integritas data.
               </div>
             </div>
 
-            <div class="match-result wait" id="match-result">
-              <div class="spinner" style="width:14px;height:14px;"></div>
-              <span id="match-text">Menghitung hash hasil dekripsi...</span>
-            </div>
-
-            <!-- Mode enkripsi: belum bisa verifikasi -->
-            <div id="encrypt-note" style="display:none; font-size:12px; color:var(--text-muted); padding:8px 0; line-height:1.7;">
-              Hash plaintext asli sudah disimpan di sesi ini.<br>
-              Jalankan <strong>Dekripsi</strong> pada file output untuk memverifikasi integritasnya.
-              <div style="margin-top:8px; font-family:var(--font-mono); font-size:11px; color:var(--accent);" id="stored-hash-display"></div>
+            <!-- Decrypt mode: two-card comparison -->
+            <div id="decrypt-hash-section" style="display:none;">
+              <div class="hash-row" id="row-original">
+                <div class="hash-label">Hash Plaintext Asli<br><span style="font-weight:400;text-transform:none;letter-spacing:0;">(dari paket ciphertext)</span></div>
+                <div class="hash-value" id="hash-original">—</div>
+                <div class="hash-badge pending" id="badge-original">SHA-256</div>
+              </div>
+              <div class="hash-row" id="row-decrypted" style="margin-top:6px;">
+                <div class="hash-label">Hash Hasil Dekripsi<br><span style="font-weight:400;text-transform:none;letter-spacing:0;">(dihitung ulang)</span></div>
+                <div class="hash-value" id="hash-decrypted">—</div>
+                <div class="hash-badge pending" id="badge-decrypted">SHA-256</div>
+              </div>
+              <div class="match-result wait" id="match-result" style="margin-top:8px;">
+                <span id="match-text">—</span>
+              </div>
             </div>
 
           </div>
@@ -244,11 +247,6 @@
           <div class="card-value" style="font-family:var(--font-mono);" id="info-size">—</div>
         </div>
 
-        <div class="card-sm animate-in" id="info-hash-card" style="display:none;">
-          <div class="card-label">Hash Plaintext</div>
-          <div style="font-family:var(--font-mono); font-size:9px; color:var(--accent);
-               word-break:break-all; line-height:1.7; margin-top:4px;" id="info-hash">—</div>
-        </div>
       </div>
 
     </div>
@@ -324,69 +322,49 @@
       (mode === 'DECRYPT' ? 'PLAINTEXT' : 'CIPHERTEXT') + '</span>';
     renderHexDump(hexDump);
 
-    // Hash section
-    const plaintextHash = window.javaBridge ? window.javaBridge.getPlaintextHash() : '';
+    // Hash section — both hashes are already computed by the process step; just read them.
+    const plaintextHash    = window.javaBridge ? window.javaBridge.getPlaintextHash()     : '';
+    const decryptedHash    = window.javaBridge ? window.javaBridge.getDecryptedFileHash() : '';
 
     if (mode === 'DECRYPT') {
-      // Tampilkan hash comparison
-      document.getElementById('row-original').style.display = 'flex';
-      document.getElementById('row-decrypted').style.display = 'flex';
+      document.getElementById('decrypt-hash-section').style.display = 'block';
+
+      // Original hash (extracted from the ciphertext packet)
       document.getElementById('hash-original').textContent = plaintextHash || '(tidak tersedia)';
+      document.getElementById('badge-original').className  = plaintextHash ? 'hash-badge match' : 'hash-badge pending';
+      document.getElementById('badge-original').textContent = 'SHA-256';
 
-      if (plaintextHash) {
-        // Jalankan verifikasi hash
-        window.javaBridge.verifyHash();
+      // Decrypted file hash (computed after decryption)
+      document.getElementById('hash-decrypted').textContent = decryptedHash || '(tidak tersedia)';
+
+      if (plaintextHash && decryptedHash) {
+        const isMatch = plaintextHash.toLowerCase() === decryptedHash.toLowerCase();
+        document.getElementById('badge-decrypted').className  = 'hash-badge ' + (isMatch ? 'match' : 'mismatch');
+        document.getElementById('badge-decrypted').textContent = isMatch ? '✓ Cocok' : '✗ Beda';
+
+        const resultEl = document.getElementById('match-result');
+        if (isMatch) {
+          resultEl.className = 'match-result ok';
+          resultEl.innerHTML = '<span id="match-text"><strong>✓ Hash Identik</strong> — Integritas data terjaga, tidak ada perubahan selama enkripsi / dekripsi</span>';
+          document.getElementById('status-text').textContent = '✓ Integritas terverifikasi';
+        } else {
+          resultEl.className = 'match-result fail';
+          resultEl.innerHTML = '<span id="match-text"><strong>✗ Hash Berbeda</strong> — Data mungkin rusak atau kunci yang digunakan berbeda dengan saat enkripsi</span>';
+          document.getElementById('status-text').textContent = '✗ Integritas tidak cocok';
+        }
       } else {
+        document.getElementById('badge-decrypted').className  = 'hash-badge pending';
+        document.getElementById('badge-decrypted').textContent = 'SHA-256';
         document.getElementById('match-result').className = 'match-result wait';
-        document.getElementById('match-text').textContent =
-          'Hash plaintext asli tidak tersedia (file di-load tanpa hashing di Layar 2)';
+        document.getElementById('match-result').innerHTML =
+          '<span id="match-text">Hash tidak tersedia — tidak dapat memverifikasi integritas</span>';
+        document.getElementById('status-text').textContent = 'Dekripsi selesai';
       }
     } else {
-      // Mode enkripsi — tampilkan catatan + simpan hash
-      document.getElementById('match-result').style.display = 'none';
-      document.getElementById('row-original').style.display = 'none';
-      document.getElementById('row-decrypted').style.display = 'none';
-      document.getElementById('encrypt-note').style.display = 'block';
-
-      if (plaintextHash) {
-        document.getElementById('stored-hash-display').textContent =
-          'Hash tersimpan: ' + plaintextHash;
-        document.getElementById('info-hash-card').style.display = 'block';
-        document.getElementById('info-hash').textContent = plaintextHash;
-      }
+      // Encrypt mode: hash panel not shown — verification happens at decrypt time
+      document.getElementById('hash-panel').style.display = 'none';
+      document.getElementById('status-text').textContent = 'Enkripsi selesai';
     }
-
-    document.getElementById('status-text').textContent = 'Proses ' + modeLabel.toLowerCase() + ' selesai';
-  }
-
-  // Callback verifikasi hash (mode dekripsi)
-  function onHashVerified(decryptedHash, originalHash, isMatch) {
-    document.getElementById('hash-decrypted').textContent = decryptedHash;
-    document.getElementById('badge-decrypted').innerHTML = '';
-    document.getElementById('badge-decrypted').className =
-      'hash-badge ' + (isMatch ? 'match' : 'mismatch');
-    document.getElementById('badge-decrypted').textContent = isMatch ? '✓ Match' : '✗ Beda';
-
-    document.getElementById('badge-original').className = 'hash-badge match';
-    document.getElementById('badge-original').textContent = 'SHA-256';
-
-    const resultEl = document.getElementById('match-result');
-    if (isMatch) {
-      resultEl.className = 'match-result ok';
-      document.getElementById('match-text').innerHTML =
-        '<strong>✓ Hash Identik</strong> — Integritas data terjaga, tidak ada perubahan selama enkripsi/dekripsi';
-    } else {
-      resultEl.className = 'match-result fail';
-      document.getElementById('match-text').innerHTML =
-        '<strong>✗ Hash Berbeda</strong> — Data mungkin rusak atau kunci yang digunakan salah';
-    }
-    document.getElementById('status-text').textContent =
-      isMatch ? '✓ Integritas terverifikasi' : '✗ Integritas tidak cocok';
-  }
-
-  function onHashError(message) {
-    document.getElementById('match-result').className = 'match-result fail';
-    document.getElementById('match-text').textContent = 'Error verifikasi hash: ' + message;
   }
 
   function onResultError(message) {

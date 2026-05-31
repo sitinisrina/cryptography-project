@@ -186,11 +186,6 @@
           <div class="card-value" id="info-mode">—</div>
         </div>
 
-        <div class="card-sm animate-in">
-          <div class="card-label">File Input</div>
-          <div class="card-value" id="info-file" style="word-break:break-all; font-size:12px;">—</div>
-        </div>
-
         <div class="card-sm animate-in" id="timing-card" style="display:none;">
           <div class="card-label">Total Waktu</div>
           <div class="card-value" style="font-family:var(--font-mono);" id="info-timing">—</div>
@@ -233,36 +228,35 @@
   const STEP_DEFS = {
     RSA_AES: {
       ENCRYPT: [
-        { name: 'Membaca file plaintext',              detail: 'Memuat byte dari disk' },
-        { name: 'Membangkitkan session key AES-256',   detail: 'CSPRNG → 256-bit key' },
-        { name: 'Enkripsi data → AES-256-GCM',         detail: 'IV 12-byte · ciphertext · auth tag 128-bit' },
-        { name: 'Enkripsi session key → RSA-OAEP',     detail: 'RSA-OAEP-SHA256 · 2048-bit' },
-        { name: 'Membangun paket & menyimpan output',  detail: 'len(Ck) ‖ Ck ‖ len(Cm) ‖ Cm → .bin' }
+        { name: 'Menghitung hash SHA-256 plaintext',           detail: 'SHA-256(plaintext) → 32 byte header' },
+        { name: 'Membangkitkan session key AES-256',           detail: 'CSPRNG → 256-bit key' },
+        { name: 'Enkripsi session key → RSA-OAEP',             detail: 'RSA-OAEP-SHA256 · 2048-bit' },
+        { name: 'Sisipkan hash & enkripsi data → AES-256-GCM', detail: 'hash ‖ len(Ck) ‖ Ck ‖ IV ‖ ciphertext ‖ tag → .bin' }
       ],
       DECRYPT: [
-        { name: 'Membaca paket ciphertext',            detail: 'Memuat file .bin dari disk' },
-        { name: 'Parsing paket — ekstrak Ck dan Cm',  detail: 'Baca header length prefix' },
-        { name: 'Dekripsi session key → RSA-OAEP',    detail: 'RSA private key decrypt' },
-        { name: 'Dekripsi data → AES-256-GCM',        detail: 'Verifikasi auth tag + dekripsi' },
-        { name: 'Menyimpan hasil dekripsi',            detail: 'Tulis plaintext ke file output' }
+        { name: 'Membaca paket & ekstrak hash SHA-256 asli',   detail: 'Baca 32-byte hash dari header paket' },
+        { name: 'Parsing paket — ekstrak Ck',                  detail: 'Baca header length prefix' },
+        { name: 'Dekripsi session key → RSA-OAEP',             detail: 'RSA private key decrypt' },
+        { name: 'Dekripsi data → AES-256-GCM',                 detail: 'Verifikasi auth tag + dekripsi' },
+        { name: 'Menyimpan hasil dekripsi',                    detail: 'Tulis plaintext ke file output' },
+        { name: 'Verifikasi hash SHA-256 hasil dekripsi',      detail: 'SHA-256(hasil) dibandingkan dengan hash asli dari paket' }
       ]
     },
     DHIES_AES: {
       ENCRYPT: [
-        { name: 'Membaca file plaintext',                           detail: 'Memuat byte dari disk' },
-        { name: 'Memuat kunci publik DH Bob',                       detail: 'Load bob_DH_public_key.bin' },
-        { name: 'Membangkitkan kunci ephemeral Alice (u, U=g^u)',   detail: 'DH key pair generation' },
-        { name: 'Menghitung shared secret Z = DH(u, BobPubKey)',    detail: 'Diffie-Hellman key agreement' },
-        { name: 'Derive encKey & macKey via HKDF-SHA256',           detail: 'AES-256-CTR encryption' },
-        { name: 'Generate tag T = HMAC-SHA256(macKey, salt ‖ C)',   detail: '256-bit authentication tag' },
-        { name: 'Membangun paket output (U ‖ salt ‖ C ‖ T)',        detail: 'Tulis ke encrypted_DHIES_file.bin' }
+        { name: 'Menghitung hash SHA-256 plaintext',                          detail: 'SHA-256(plaintext) → 32 byte header' },
+        { name: 'Memuat kunci publik DH Bob',                                 detail: 'Load bob_DH_public_key.bin' },
+        { name: 'Membangkitkan kunci ephemeral, shared secret Z & derive keys', detail: 'DH key gen + DH agreement + HKDF-SHA256' },
+        { name: 'Sisipkan hash & enkripsi AES-256-CTR + HMAC-SHA256',        detail: 'hash ‖ U ‖ salt ‖ IV ‖ ciphertext ‖ HMAC tag → .bin' }
       ],
       DECRYPT: [
-        { name: 'Membaca paket ciphertext DHIES',                   detail: 'Memuat file .bin dari disk' },
-        { name: 'Parsing paket — ekstrak U, salt, C, T',            detail: 'Baca komponen paket' },
-        { name: 'Menghitung shared secret Z = DH(BobPrivKey, U)',   detail: 'DH key agreement' },
-        { name: 'Verifikasi HMAC-SHA256 & dekripsi AES-256-CTR',    detail: 'Autentikasi + dekripsi' },
-        { name: 'Menyimpan hasil dekripsi',                         detail: 'Tulis plaintext ke file output' }
+        { name: 'Membaca & parsing header paket DHIES',         detail: 'Baca 32-byte hash + U, salt, panjang data' },
+        { name: 'Memuat kunci privat DH Bob',                   detail: 'Load bob_DH_private_key.bin' },
+        { name: 'Menghitung shared secret Z & derive keys',     detail: 'DH key agreement + HKDF-SHA256' },
+        { name: 'Verifikasi HMAC-SHA256 (streaming)',           detail: 'Baca seluruh ciphertext untuk autentikasi MAC' },
+        { name: 'Dekripsi AES-256-CTR (streaming)',             detail: 'IV + ciphertext → plaintext' },
+        { name: 'Menyimpan hasil dekripsi',                     detail: 'Tulis plaintext ke file output' },
+        { name: 'Verifikasi hash SHA-256 hasil dekripsi',       detail: 'SHA-256(hasil) dibandingkan dengan hash asli dari paket' }
       ]
     }
   };
@@ -345,8 +339,8 @@
       el.querySelector('.step-bullet').innerHTML =
         '<div class="spinner" style="width:12px;height:12px;border-width:1.5px;"></div>';
     }
-    // Update connector sebelumnya
-    const conn = document.getElementById('connector-' + stepIndex);
+    // Mark the connector that sits above this step as done (connector-N is between step-N and step-(N+1))
+    const conn = document.getElementById('connector-' + (stepIndex - 1));
     if (conn) conn.classList.add('done');
 
     document.getElementById('current-step-label').textContent =

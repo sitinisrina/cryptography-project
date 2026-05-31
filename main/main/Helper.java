@@ -78,7 +78,17 @@ public class Helper {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hashBytes = digest.digest(data);
         return fromBinaryToHexa(hashBytes);
-    }    
+    }
+
+    public static String sha256HashFile(String filePath) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] buf = new byte[8 * 1024 * 1024];
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(filePath)) {
+            int n;
+            while ((n = fis.read(buf)) != -1) digest.update(buf, 0, n);
+        }
+        return fromBinaryToHexa(digest.digest());
+    }
 
     public static byte[] buildEncryptedPackage(byte[] ephemeralPublicKey, byte[] salt, byte[] ciphertext, byte[] tag) {
         if (ephemeralPublicKey == null || salt == null || ciphertext == null || tag == null) {

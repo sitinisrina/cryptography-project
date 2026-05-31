@@ -166,7 +166,7 @@
         <div class="scheme-radio"><div class="scheme-radio-dot"></div></div>
         <div class="scheme-badge">RSA-AES</div>
         <div class="scheme-name">RSA-AES</div>
-        <div class="scheme-desc">Enkripsi hibrida menggunakan RSA untuk mengamankan session key, dan AES-GCM untuk enkripsi data dengan autentikasi.</div>
+        <div class="scheme-desc">Enkripsi hibrida menggunakan RSA untuk mengamankan kunci sesi, dan AES-GCM untuk enkripsi data dengan autentikasi.</div>
         <div class="scheme-algo">
           <div class="scheme-algo-item">RSA-OAEP-SHA256 (2048-bit)</div>
           <div class="scheme-algo-item">AES-256-GCM</div>
@@ -179,7 +179,7 @@
         <div class="scheme-radio"><div class="scheme-radio-dot"></div></div>
         <div class="scheme-badge">DHIES-AES</div>
         <div class="scheme-name">DHIES-AES</div>
-        <div class="scheme-desc">Enkripsi hibrida berbasis Diffie-Hellman ephemeral dengan key derivation HKDF, enkripsi AES-CTR, dan autentikasi HMAC.</div>
+        <div class="scheme-desc">Enkripsi hibrida berbasis Diffie-Hellman ephemeral dengan key derivation HKDF, enkripsi data AES-CTR, dan autentikasi data menggunakan HMAC.</div>
         <div class="scheme-algo">
           <div class="scheme-algo-item">DH Ephemeral (2048-bit)</div>
           <div class="scheme-algo-item">HKDF-SHA256 · AES-256-CTR</div>
@@ -233,6 +233,9 @@
       if (window.javaBridge) {
         operationMode = window.javaBridge.getMode();
         updatePageSubtitle();
+        if (operationMode === 'DECRYPT') {
+          document.getElementById('key-panel').style.display = 'none';
+        }
       }
     }, 150);
   };
@@ -268,10 +271,12 @@
       (isEncrypt ? 'PUBLIC KEY' : 'PRIVATE KEY') + '</span>';
 
     // Loading state
-    document.getElementById('key-content').innerHTML =
-      '<div class="key-status loading"><div class="spinner"></div>Memuat kunci...</div>';
     document.getElementById('btn-next').disabled = true;
     document.getElementById('status-text').textContent = 'Memuat kunci...';
+    if (operationMode !== 'DECRYPT') {
+      document.getElementById('key-content').innerHTML =
+        '<div class="key-status loading"><div class="spinner"></div>Memuat kunci...</div>';
+    }
 
     // Kirim ke Java dan minta load key
     if (window.javaBridge) {
@@ -283,6 +288,13 @@
   // Callback: kunci berhasil dimuat
   function onKeyLoaded(keyFileName, fingerprint, keyBase64, keyLabel) {
     keyLoaded = true;
+
+    if (operationMode === 'DECRYPT') {
+      document.getElementById('btn-next').disabled = false;
+      document.getElementById('status-text').textContent = 'Kunci privat siap — siap memulai proses';
+      return;
+    }
+
     const isEncrypt = operationMode !== 'DECRYPT';
     const color = selectedScheme === 'RSA_AES' ? 'var(--rsa-color)' : 'var(--dhies-color)';
     const statusLabel = isEncrypt ? 'Kunci publik dimuat' : 'Kunci privat dimuat';
@@ -316,13 +328,16 @@
   // Callback: error load kunci
   function onKeyError(message) {
     keyLoaded = false;
+    document.getElementById('btn-next').disabled = true;
+    document.getElementById('status-text').textContent = 'File kunci tidak ditemukan';
+
+    if (operationMode === 'DECRYPT') return;
+
     document.getElementById('key-content').innerHTML =
       '<div class="key-status error">✗ ' + escapeHtml(message) + '</div>' +
       '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">' +
         'Pastikan file kunci berada di folder root project (setara folder <code style="font-family:var(--font-mono)">main/</code>).' +
       '</div>';
-    document.getElementById('btn-next').disabled = true;
-    document.getElementById('status-text').textContent = 'File kunci tidak ditemukan';
   }
 
   function goBack() { if (window.javaBridge) window.javaBridge.navigateTo('preview.html'); }

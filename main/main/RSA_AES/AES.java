@@ -6,6 +6,8 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -61,6 +63,45 @@ public class AES {
             throw new RuntimeException("Encrypt AES-GCM gagal", e);
         }  
     }    
+
+    public static void encryptToStream(InputStream plainIn, OutputStream encOut, SecretKey key) throws Exception {
+        byte[] iv = generateIV();
+        Cipher cipher = Cipher.getInstance(ALGORITHM);
+        cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
+        encOut.write(iv);
+        byte[] buf = new byte[8 * 1024 * 1024];
+        int n;
+        while ((n = plainIn.read(buf)) != -1) {
+            byte[] enc = cipher.update(buf, 0, n);
+            if (enc != null) encOut.write(enc);
+        }
+        byte[] tail = cipher.doFinal(); // appends 16-byte GCM auth tag
+        if (tail != null) encOut.write(tail);
+    }
+
+    public static void decryptFromStream(InputStream encIn, OutputStream plainOut, SecretKey key) throws Exception {
+        byte[] iv = new byte[IV_LENGTH];
+        readFully(encIn, iv);
+        Cipher cipher = Cipher.getInstance(ALGORITHM);
+        cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
+        byte[] buf = new byte[8 * 1024 * 1024];
+        int n;
+        while ((n = encIn.read(buf)) != -1) {
+            byte[] dec = cipher.update(buf, 0, n);
+            if (dec != null) plainOut.write(dec);
+        }
+        byte[] tail = cipher.doFinal(); // verifies GCM tag — throws AEADBadTagException if tampered
+        if (tail != null) plainOut.write(tail);
+    }
+
+    private static void readFully(InputStream in, byte[] buf) throws Exception {
+        int offset = 0;
+        while (offset < buf.length) {
+            int r = in.read(buf, offset, buf.length - offset);
+            if (r == -1) throw new RuntimeException("Stream berakhir sebelum waktunya saat membaca IV.");
+            offset += r;
+        }
+    }
 
     public static byte[] decrypt(byte[] ivAndCiphertext, SecretKey key) {
         int tagLengthBytes = GCM_TAG_LENGTH / 8;
