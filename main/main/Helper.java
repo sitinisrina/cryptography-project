@@ -90,20 +90,18 @@ public class Helper {
         return fromBinaryToHexa(digest.digest());
     }
 
-    public static byte[] buildEncryptedPackage(byte[] ephemeralPublicKey, byte[] salt, byte[] ciphertext, byte[] tag) {
-        if (ephemeralPublicKey == null || salt == null || ciphertext == null || tag == null) {
+    public static byte[] buildEncryptedPackage(byte[] ephemeralPublicKey, byte[] ciphertext, byte[] tag) {
+        if (ephemeralPublicKey == null || ciphertext == null || tag == null) {
             throw new IllegalArgumentException("Komponen paket DHIES tidak boleh null.");
         }
 
-        int totalLength = Integer.BYTES * 4
+        int totalLength = Integer.BYTES * 3
                 + ephemeralPublicKey.length
-                + salt.length
                 + ciphertext.length
                 + tag.length;
 
         ByteBuffer buffer = ByteBuffer.allocate(totalLength);
         putBytes(buffer, ephemeralPublicKey);
-        putBytes(buffer, salt);
         putBytes(buffer, ciphertext);
         putBytes(buffer, tag);
 
@@ -118,7 +116,6 @@ public class Helper {
         ByteBuffer buffer = ByteBuffer.wrap(encryptedPackage);
 
         byte[] ephemeralPublicKey = getBytes(buffer, "ephemeral public key");
-        byte[] salt = getBytes(buffer, "salt");
         byte[] ciphertext = getBytes(buffer, "ciphertext");
         byte[] tag = getBytes(buffer, "tag");
 
@@ -126,7 +123,7 @@ public class Helper {
             throw new IllegalArgumentException("Format paket DHIES tidak valid: ada data berlebih.");
         }
 
-        return new byte[][] { ephemeralPublicKey, salt, ciphertext, tag };
+        return new byte[][] { ephemeralPublicKey, ciphertext, tag };
     }
 
     private static void putBytes(ByteBuffer buffer, byte[] data) {

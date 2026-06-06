@@ -6,8 +6,6 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.SecureRandom;
-
 import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -26,8 +24,6 @@ public class DHIES {
     private static final int ENC_KEY_SIZE_BYTES = 32; // AES-256
     private static final int MAC_KEY_SIZE_BYTES = 32; // HMAC-SHA256 key
     private static final int TOTAL_DERIVED_KEY_SIZE_BYTES = ENC_KEY_SIZE_BYTES + MAC_KEY_SIZE_BYTES;
-    private static final int HKDF_SALT_SIZE_BYTES = 16;
-
     public static class DerivedKeys {
         private final SecretKey encKey;
         private final SecretKey macKey;
@@ -89,24 +85,16 @@ public class DHIES {
         return keyAgree.generateSecret();
     }
 
-    public static byte[] generateRandomSalt() {
-        byte[] salt = new byte[HKDF_SALT_SIZE_BYTES];
-        new SecureRandom().nextBytes(salt);
-        return salt;
-    }
-
-    public static DerivedKeys deriveKeys(byte[] sharedSecret, byte[] salt) throws Exception {
+    public static DerivedKeys deriveKeys(byte[] sharedSecret) throws Exception {
         if (sharedSecret == null || sharedSecret.length == 0) {
             throw new IllegalArgumentException("Shared secret tidak boleh null atau kosong.");
         }
 
-        if (salt == null || salt.length == 0) {
-            throw new IllegalArgumentException("Salt tidak boleh null atau kosong.");
-        }
-
         byte[] info = "DHIES-AES-v1".getBytes(StandardCharsets.UTF_8);
+        // RFC 5869: default salt when none provided is a string of HashLen (32) zero bytes
+        byte[] defaultSalt = new byte[32];
 
-        byte[] prk = hkdfExtract(salt, sharedSecret); // prk : pseudorandom key
+        byte[] prk = hkdfExtract(defaultSalt, sharedSecret); // prk : pseudorandom key
         byte[] okm = hkdfExpand(prk, info, TOTAL_DERIVED_KEY_SIZE_BYTES); // okm : output key material
 
         byte[] encKeyBytes = new byte[ENC_KEY_SIZE_BYTES];

@@ -533,12 +533,10 @@ public class AppBridge {
             var aliceKP = main.DHIES_AES.DHIES.generateKeyPairFromPeerPublicKey(bobPubKey);
             byte[] sharedSecret = main.DHIES_AES.DHIES.computeSharedSecret(
                 aliceKP.getPrivate(), bobPubKey);
-            byte[] salt = main.DHIES_AES.DHIES.generateRandomSalt();
-            var derivedKeys = main.DHIES_AES.DHIES.deriveKeys(sharedSecret, salt);
+            var derivedKeys = main.DHIES_AES.DHIES.deriveKeys(sharedSecret);
             notifyStepDone(3, System.nanoTime() - t3, sharedSecret.length + " byte → encKey + macKey");
 
-            // Step 4: write [hash 32B][ephPubKey][salt][ivLen][IV+ciphertext][HMAC tag]
-            // hashBytes is included in HMAC(hash || salt || IV || ciphertext)
+            // Step 4: write [hash 32B][ephPubKey][ivLen][IV+ciphertext][HMAC tag]
             notifyStepStart(4, "Sisipkan hash & enkripsi AES-256-CTR + HMAC-SHA256 (streaming)");
             long t4 = System.nanoTime();
             byte[] ephPubKey = aliceKP.getPublic().getEncoded();
@@ -550,11 +548,9 @@ public class AppBridge {
                 dos.write(hashBytes);          // 32 bytes: SHA-256 of plaintext
                 dos.writeInt(ephPubKey.length);
                 dos.write(ephPubKey);
-                dos.writeInt(salt.length);
-                dos.write(salt);
                 dos.writeLong(ivAndCiphertextLen);
                 byte[] tag = main.DHIES_AES.AES_DHIES.encryptToStreamWithMAC(
-                    bis, dos, derivedKeys.getEncKey(), derivedKeys.getMacKey(), salt, hashBytes);
+                    bis, dos, derivedKeys.getEncKey(), derivedKeys.getMacKey());
                 dos.write(tag);
             }
             outputFile = new File(outPath);
@@ -626,7 +622,6 @@ public class AppBridge {
             long t1 = System.nanoTime();
             byte[] embeddedHash = new byte[32];
             byte[] ephPubKeyBytes;
-            byte[] salt;
             long ivAndCiphertextLen;
             int headerSize;
             try (DataInputStream hdr = new DataInputStream(
@@ -635,11 +630,8 @@ public class AppBridge {
                 int ephPubKeyLen = hdr.readInt();
                 ephPubKeyBytes = new byte[ephPubKeyLen];
                 hdr.readFully(ephPubKeyBytes);
-                int saltLen = hdr.readInt();
-                salt = new byte[saltLen];
-                hdr.readFully(salt);
                 ivAndCiphertextLen = hdr.readLong();
-                headerSize = 32 + 4 + ephPubKeyLen + 4 + saltLen + 8;
+                headerSize = 32 + 4 + ephPubKeyLen + 8;
             }
             plaintextHash = Helper.fromBinaryToHexa(embeddedHash);
             notifyStepDone(1, System.nanoTime() - t1, "Hash asli: " + plaintextHash.substring(0, 16) + "...");
@@ -654,16 +646,14 @@ public class AppBridge {
             long t3 = System.nanoTime();
             PublicKey aliceEphPub = Helper.loadPublicKeyFromBytes(ephPubKeyBytes, "DH");
             byte[] sharedSecret = main.DHIES_AES.DHIES.computeSharedSecret(bobPrivKey, aliceEphPub);
-            var derivedKeys = main.DHIES_AES.DHIES.deriveKeys(sharedSecret, salt);
+            var derivedKeys = main.DHIES_AES.DHIES.deriveKeys(sharedSecret);
             notifyStepDone(3, System.nanoTime() - t3, sharedSecret.length + " byte → encKey + macKey");
 
-            // Pass 1: verify HMAC(embeddedHash || salt || IV || ciphertext) before writing any output
+            // Pass 1: verify HMAC(IV || ciphertext) before writing any output
             notifyStepStart(4, "Verifikasi HMAC-SHA256 (streaming)");
             long t4 = System.nanoTime();
             javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
             mac.init(derivedKeys.getMacKey());
-            mac.update(embeddedHash);   // must match what encryptToStreamWithMAC used during encryption
-            mac.update(salt);
             try (DataInputStream verifyDis = new DataInputStream(
                     new BufferedInputStream(new FileInputStream(selectedFile)))) {
                 main.DHIES_AES.AES_DHIES.readFully(verifyDis, new byte[headerSize]);

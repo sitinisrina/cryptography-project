@@ -27,11 +27,10 @@ public class DHIESAliceasSender {
         HybridDHIES_AES.HybridEncryptData encryptedResult = HybridDHIES_AES.encrypt(fileContent, sharedSecret);
 
         byte[] ephemeralPublicKey = aliceEphemeralKeyPair.getPublic().getEncoded();
-        byte[] salt = encryptedResult.getSalt();
         byte[] ciphertext = encryptedResult.getCiphertext();
         byte[] tag = encryptedResult.getTag();
 
-        return Helper.buildEncryptedPackage(ephemeralPublicKey, salt, ciphertext, tag);
+        return Helper.buildEncryptedPackage(ephemeralPublicKey, ciphertext, tag);
     }
 
     /**
@@ -40,7 +39,6 @@ public class DHIESAliceasSender {
      *
      * Package format:
      *   [4-byte int: ephPubKeyLen] [ephPubKey]
-     *   [4-byte int: saltLen] [salt]
      *   [8-byte long: ivAndCiphertextLen]
      *   [IV (16 B) + ciphertext]
      *   [32-byte HMAC-SHA256 tag]
@@ -50,8 +48,7 @@ public class DHIESAliceasSender {
         KeyPair aliceEphemeralKeyPair = DHIES.generateKeyPairFromPeerPublicKey(bobPublicKey);
         byte[] sharedSecret = DHIES.computeSharedSecret(aliceEphemeralKeyPair.getPrivate(), bobPublicKey);
         byte[] ephPubKey = aliceEphemeralKeyPair.getPublic().getEncoded();
-        byte[] salt = DHIES.generateRandomSalt();
-        DHIES.DerivedKeys derivedKeys = DHIES.deriveKeys(sharedSecret, salt);
+        DHIES.DerivedKeys derivedKeys = DHIES.deriveKeys(sharedSecret);
 
         long plaintextLen = java.nio.file.Files.size(java.nio.file.Paths.get(inputPath));
         long ivAndCiphertextLen = AES_DHIES.IV_LENGTH + plaintextLen;
@@ -61,11 +58,9 @@ public class DHIESAliceasSender {
              BufferedInputStream bis = new BufferedInputStream(new FileInputStream(inputPath))) {
             dos.writeInt(ephPubKey.length);
             dos.write(ephPubKey);
-            dos.writeInt(salt.length);
-            dos.write(salt);
             dos.writeLong(ivAndCiphertextLen);
             byte[] tag = AES_DHIES.encryptToStreamWithMAC(
-                bis, dos, derivedKeys.getEncKey(), derivedKeys.getMacKey(), salt);
+                bis, dos, derivedKeys.getEncKey(), derivedKeys.getMacKey());
             dos.write(tag);
         }
     }
@@ -85,8 +80,7 @@ public class DHIESAliceasSender {
             KeyPair aliceEphemeralKeyPair = DHIES.generateKeyPairFromPeerPublicKey(bobPublicKey);
             byte[] sharedSecret = DHIES.computeSharedSecret(aliceEphemeralKeyPair.getPrivate(), bobPublicKey);
             byte[] ephemeralPublicKeyBytes = aliceEphemeralKeyPair.getPublic().getEncoded();
-            byte[] salt = DHIES.generateRandomSalt();
-            DHIES.DerivedKeys derivedKeys = DHIES.deriveKeys(sharedSecret, salt);
+            DHIES.DerivedKeys derivedKeys = DHIES.deriveKeys(sharedSecret);
 
             // Benchmark: stream-encrypt with HMAC in 8 MB chunks (no huge cipher.doFinal)
             ByteArrayOutputStream ciphertextBaos = new ByteArrayOutputStream();
@@ -95,7 +89,7 @@ public class DHIESAliceasSender {
             BenchmarkHelper.BenchmarkResult benchmarkResult = BenchmarkHelper.measure(() -> {
                 tagHolder[0] = AES_DHIES.encryptToStreamWithMAC(
                     new ByteArrayInputStream(fileContent), ciphertextBaos,
-                    derivedKeys.getEncKey(), derivedKeys.getMacKey(), salt);
+                    derivedKeys.getEncKey(), derivedKeys.getMacKey());
             });
 
             // Write streaming-format package to file
@@ -104,8 +98,6 @@ public class DHIESAliceasSender {
                      new BufferedOutputStream(new FileOutputStream("encrypted_DHIES_file.bin")))) {
                 dos.writeInt(ephemeralPublicKeyBytes.length);
                 dos.write(ephemeralPublicKeyBytes);
-                dos.writeInt(salt.length);
-                dos.write(salt);
                 dos.writeLong(ivAndCiphertext.length);
                 dos.write(ivAndCiphertext);
                 dos.write(tagHolder[0]);
@@ -119,7 +111,7 @@ public class DHIESAliceasSender {
 
             System.out.println("Hash SHA-256 file asli          : " + originalHash);
             System.out.println("File berhasil dienkripsi dengan skema DHIES-AES.");
-            System.out.println("Seluruh komponen DHIES (ephemeral public key, salt, tag, ciphertext) disimpan dalam satu file: 'encrypted_DHIES_file.bin'.");
+            System.out.println("Seluruh komponen DHIES (ephemeral public key, tag, ciphertext) disimpan dalam satu file: 'encrypted_DHIES_file.bin'.");
             System.out.println("Hasil benchmark Alice disimpan sebagai 'alice_benchmark.txt'.");
 
         } catch (Exception e) {

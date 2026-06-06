@@ -247,10 +247,10 @@
         { name: 'Menghitung hash SHA-256 plaintext',                          detail: 'SHA-256(plaintext) → 32 byte header' },
         { name: 'Memuat kunci publik DH Bob',                                 detail: 'Load bob_DH_public_key.bin' },
         { name: 'Membangkitkan kunci ephemeral, shared secret Z & derive keys', detail: 'DH key gen + DH agreement + HKDF-SHA256' },
-        { name: 'Sisipkan hash & enkripsi AES-256-CTR + HMAC-SHA256',        detail: 'hash ‖ U ‖ salt ‖ IV ‖ ciphertext ‖ HMAC tag → .bin' }
+        { name: 'Sisipkan hash & enkripsi AES-256-CTR + HMAC-SHA256',        detail: 'hash ‖ U ‖ IV ‖ ciphertext ‖ HMAC tag → .bin' }
       ],
       DECRYPT: [
-        { name: 'Membaca & parsing header paket DHIES',         detail: 'Baca 32-byte hash + U, salt, panjang data' },
+        { name: 'Membaca & parsing header paket DHIES',         detail: 'Baca 32-byte hash + U, panjang data' },
         { name: 'Memuat kunci privat DH Bob',                   detail: 'Load bob_DH_private_key.bin' },
         { name: 'Menghitung shared secret Z & derive keys',     detail: 'DH key agreement + HKDF-SHA256' },
         { name: 'Verifikasi HMAC-SHA256 (streaming)',           detail: 'Baca seluruh ciphertext untuk autentikasi MAC' },

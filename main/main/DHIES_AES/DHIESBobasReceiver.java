@@ -21,9 +21,8 @@ public class DHIESBobasReceiver {
         byte[][] parsedPackage = Helper.parseDHIESPackage(encryptedPackage);
 
         byte[] aliceEphemeralPublicKeyBytes = parsedPackage[0];
-        byte[] salt = parsedPackage[1];
-        byte[] ciphertext = parsedPackage[2];
-        byte[] tag = parsedPackage[3];
+        byte[] ciphertext = parsedPackage[1];
+        byte[] tag = parsedPackage[2];
 
         PublicKey aliceEphemeralPublicKey =
                 Helper.loadPublicKeyFromBytes(aliceEphemeralPublicKeyBytes, "DH");
@@ -34,7 +33,7 @@ public class DHIESBobasReceiver {
         );
 
         HybridDHIES_AES.HybridEncryptData hybridData =
-                new HybridDHIES_AES.HybridEncryptData(salt, ciphertext, tag);
+                new HybridDHIES_AES.HybridEncryptData(ciphertext, tag);
 
         return HybridDHIES_AES.decrypt(hybridData, sharedSecret);
     }
@@ -48,7 +47,6 @@ public class DHIESBobasReceiver {
         PrivateKey bobPrivateKey = Helper.loadPrivateKey("bob_DH_private_key.bin", "DH");
 
         byte[] ephPubKeyBytes;
-        byte[] salt;
         long ivAndCiphertextLen;
         int headerSize;
 
@@ -58,21 +56,17 @@ public class DHIESBobasReceiver {
             int ephPubKeyLen = dis.readInt();
             ephPubKeyBytes = new byte[ephPubKeyLen];
             dis.readFully(ephPubKeyBytes);
-            int saltLen = dis.readInt();
-            salt = new byte[saltLen];
-            dis.readFully(salt);
             ivAndCiphertextLen = dis.readLong();
-            headerSize = 4 + ephPubKeyLen + 4 + saltLen + 8;
+            headerSize = 4 + ephPubKeyLen + 8;
         }
 
         PublicKey aliceEphemeralPublicKey = Helper.loadPublicKeyFromBytes(ephPubKeyBytes, "DH");
         byte[] sharedSecret = DHIES.computeSharedSecret(bobPrivateKey, aliceEphemeralPublicKey);
-        DHIES.DerivedKeys derivedKeys = DHIES.deriveKeys(sharedSecret, salt);
+        DHIES.DerivedKeys derivedKeys = DHIES.deriveKeys(sharedSecret);
 
         // Pass 1: verify HMAC — no output written yet (security-correct for Encrypt-then-MAC)
         javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
         mac.init(derivedKeys.getMacKey());
-        mac.update(salt);
         try (DataInputStream verifyDis = new DataInputStream(
                 new BufferedInputStream(new FileInputStream(inputPath)))) {
             AES_DHIES.readFully(verifyDis, new byte[headerSize]); // skip header
@@ -117,16 +111,13 @@ public class DHIESBobasReceiver {
             int ephPubKeyLen = dis.readInt();
             byte[] ephPubKeyBytes = new byte[ephPubKeyLen];
             dis.readFully(ephPubKeyBytes);
-            int saltLen = dis.readInt();
-            byte[] salt = new byte[saltLen];
-            dis.readFully(salt);
             long ivAndCiphertextLen = dis.readLong();
-            int headerSize = 4 + ephPubKeyLen + 4 + saltLen + 8;
+            int headerSize = 4 + ephPubKeyLen + 8;
 
             // Compute keys outside benchmark window
             PublicKey aliceEphemeralPublicKey = Helper.loadPublicKeyFromBytes(ephPubKeyBytes, "DH");
             byte[] sharedSecret = DHIES.computeSharedSecret(bobPrivateKey, aliceEphemeralPublicKey);
-            DHIES.DerivedKeys derivedKeys = DHIES.deriveKeys(sharedSecret, salt);
+            DHIES.DerivedKeys derivedKeys = DHIES.deriveKeys(sharedSecret);
 
             // Extract ivAndCiphertext and tag from in-memory package
             byte[] ivAndCiphertext = Arrays.copyOfRange(
@@ -138,7 +129,7 @@ public class DHIESBobasReceiver {
             ByteArrayOutputStream resultBaos = new ByteArrayOutputStream();
             BenchmarkHelper.BenchmarkResult benchmarkResult = BenchmarkHelper.measure(() -> {
                 AES_DHIES.decryptToStreamVerified(ivAndCiphertext, resultBaos,
-                    derivedKeys.getEncKey(), derivedKeys.getMacKey(), salt, expectedTag);
+                    derivedKeys.getEncKey(), derivedKeys.getMacKey(), expectedTag);
             });
 
             byte[] decryptedMessage = resultBaos.toByteArray();

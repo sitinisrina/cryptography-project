@@ -71,14 +71,11 @@ public class AES_DHIES {
 
     /**
      * Streams plaintext from plainIn to encOut (IV prepended), computing
-     * HMAC-SHA256(additionalData || salt || IV || ciphertext) simultaneously.
-     * additionalData (e.g. the plaintext SHA-256 hash) is included in the MAC
-     * so that tampering with the packet header also invalidates the tag.
-     * Pass null or empty to omit (falls back to HMAC(salt || IV || ciphertext)).
+     * HMAC-SHA256(IV || ciphertext) simultaneously.
      * Returns the 32-byte HMAC tag.
      */
     public static byte[] encryptToStreamWithMAC(InputStream plainIn, OutputStream encOut,
-            SecretKey encKey, SecretKey macKey, byte[] salt, byte[] additionalData) throws Exception {
+            SecretKey encKey, SecretKey macKey) throws Exception {
         byte[] iv = generateIV();
         encOut.write(iv);
 
@@ -87,8 +84,6 @@ public class AES_DHIES {
 
         Mac mac = Mac.getInstance(HMAC_ALGORITHM);
         mac.init(macKey);
-        if (additionalData != null && additionalData.length > 0) mac.update(additionalData);
-        mac.update(salt);
         mac.update(iv);
 
         byte[] buf = new byte[8 * 1024 * 1024];
@@ -109,15 +104,14 @@ public class AES_DHIES {
     }
 
     /**
-     * Verifies HMAC-SHA256(salt || ivAndCiphertext) == expectedTag, then
+     * Verifies HMAC-SHA256(ivAndCiphertext) == expectedTag, then
      * stream-decrypts ivAndCiphertext (in-memory) to plainOut in 8 MB chunks.
      * Throws SecurityException if tag mismatch — no plaintext is written in that case.
      */
     public static void decryptToStreamVerified(byte[] ivAndCiphertext, OutputStream plainOut,
-            SecretKey encKey, SecretKey macKey, byte[] salt, byte[] expectedTag) throws Exception {
+            SecretKey encKey, SecretKey macKey, byte[] expectedTag) throws Exception {
         Mac mac = Mac.getInstance(HMAC_ALGORITHM);
         mac.init(macKey);
-        mac.update(salt);
         mac.update(ivAndCiphertext);
         if (!Arrays.equals(expectedTag, mac.doFinal())) {
             throw new SecurityException("Verifikasi MAC gagal. Ciphertext tidak valid atau telah dimodifikasi.");
