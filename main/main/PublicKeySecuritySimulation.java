@@ -69,8 +69,6 @@ public class PublicKeySecuritySimulation {
 
     // Untuk referensi perbandingan lapisan simetris
     private static final Object[][] SYMMETRIC_REFERENCE = {
-        { "AES-128",  128,  128,  "Exhaustive Key Search" },
-        { "AES-192",  192,  192,  "Exhaustive Key Search" },
         { "AES-256",  256,  256,  "Exhaustive Key Search" },
     };
 
@@ -82,9 +80,6 @@ public class PublicKeySecuritySimulation {
     private static final Object[][] HARDWARE_PROFILES = {
         { "CPU Modern (1 core)",        new BigDecimal("1e8")  },
         { "GPU RTX 4090",               new BigDecimal("1e10") },
-        { "FPGA Khusus",                new BigDecimal("1e11") },
-        { "Superkomputer",              new BigDecimal("1e15") },
-        { "Semua Komputer di Bumi (~)", new BigDecimal("1e23") },
     };
 
     // ------------------------------------------------------------------------
@@ -359,7 +354,6 @@ public class PublicKeySecuritySimulation {
         printSeparator('-', 55);
         System.out.printf("  %-26s  %-14s  %-8s%n", "RSA-2048",              "2048",  "112");
         System.out.printf("  %-26s  %-14s  %-8s%n", "Diffie-Hellman 2048",   "2048",  "112");
-        System.out.printf("  %-26s  %-14s  %-8s  <- pembanding%n", "AES-128", "128",   "128");
         System.out.printf("  %-26s  %-14s  %-8s  <- digunakan di proyek%n", "AES-256", "256", "256");
         System.out.println();
         System.out.println("  RSA-2048 != aman seperti AES-2048.");

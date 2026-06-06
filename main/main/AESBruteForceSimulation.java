@@ -35,22 +35,11 @@ public class AESBruteForceSimulation {
     // Umur alam semesta ≈ 13.8 miliar tahun = 4.354 × 10^17 detik
     private static final BigDecimal AGE_OF_UNIVERSE_SECONDS = new BigDecimal("4.354e17");
 
-    // Definisi Varian AES
-    private static final int[] AES_KEY_SIZES = { 128, 192, 256 };
-
-    // Jumlah ronde untuk setiap varian AES (tidak mempengaruhi keyspace)
-    private static final int AES_128_ROUNDS = 10;
-    private static final int AES_192_ROUNDS = 12;
-    private static final int AES_256_ROUNDS = 14;
-
     // Nilai ini adalah estimasi umum berdasarkan literatur kriptografi
     private static final Object[][] HARDWARE_PROFILES = {
         // { nama,                        keys per detik (BigDecimal) }
         { "CPU Modern (1 core)",          new BigDecimal("1e8")  },
         { "GPU RTX 4090",                 new BigDecimal("1e10") },
-        { "FPGA Khusus",                  new BigDecimal("1e11") },
-        { "Superkomputer",                new BigDecimal("1e15") },
-        { "Semua Komputer di Bumi (~)",   new BigDecimal("1e23") },
     };
 
     // Relevansi Proyek
@@ -64,10 +53,8 @@ public class AESBruteForceSimulation {
         printProjectContext();
         printSeparator('=', 72);
 
-        // Tampilkan simulasi 
-        for (int keySize : AES_KEY_SIZES) {
-            simulateForKeySize(keySize);
-        }
+        // Tampilkan simulasi hanya untuk AES-256
+        simulateForKeySize(256);
 
         printFooter();
     }
@@ -75,22 +62,13 @@ public class AESBruteForceSimulation {
     
     //  SIMULASI PER UKURAN KUNCI
     private static void simulateForKeySize(int keyBits) {
-        BigInteger keyspace   = BigInteger.TWO.pow(keyBits);
-        int        rounds     = aesRounds(keyBits);
-
-        // Faktor koreksi kecepatan: basis AES-128 (10 round) dibanding varian ini
-        // Contoh: AES-256 (14 round) → faktor = 10/14 → lebih lambat
-        BigDecimal roundFactor = BigDecimal.valueOf(AES_128_ROUNDS)
-                                           .divide(BigDecimal.valueOf(rounds), MathContext.DECIMAL64);
+        BigInteger keyspace = BigInteger.TWO.pow(keyBits);
 
         System.out.printf("%n  ┌─────────────────────────────────────────────────────────────┐%n");
         System.out.printf("  │  AES-%d%-54s│%n", keyBits, "");
         System.out.printf("  ├─────────────────────────────────────────────────────────────┤%n");
         System.out.printf("  │  Panjang Kunci  : %d bit%n", keyBits);
-        System.out.printf("  │  Jumlah Round   : %d round%n", rounds);
         System.out.printf("  │  Keyspace (2^%d): %s%n", keyBits, formatScientific(new BigDecimal(keyspace)));
-        System.out.printf("  │  Faktor koreksi : AES-128 rounds / AES-%d rounds = 10/%d ≈ %.3f%n",
-                keyBits, rounds, roundFactor.doubleValue());
         System.out.printf("  └─────────────────────────────────────────────────────────────┘%n");
 
         System.out.printf("  %-30s  %-16s  %-22s  %-22s%n",
@@ -99,32 +77,26 @@ public class AESBruteForceSimulation {
         printSeparator('-', 95);
 
         for (Object[] hw : HARDWARE_PROFILES) {
-            String     hwName    = (String)     hw[0];
-            BigDecimal baseSpeed = (BigDecimal) hw[1];
+            String     hwName = (String)     hw[0];
+            BigDecimal speed  = (BigDecimal) hw[1];
 
-            // Kecepatan efektif = kecepatan basis × faktor koreksi round
-            BigDecimal effectiveSpeed = baseSpeed.multiply(roundFactor, MathContext.DECIMAL64);
-            BigInteger speedInt       = effectiveSpeed.toBigInteger();
-
-            BigDecimal tWorst = calculateTimeSeconds(keyspace, speedInt, false);
-            BigDecimal tAvg   = calculateTimeSeconds(keyspace, speedInt, true);
+            BigDecimal tWorst = calculateTimeSeconds(keyspace, speed.toBigInteger(), false);
+            BigDecimal tAvg   = calculateTimeSeconds(keyspace, speed.toBigInteger(), true);
 
             System.out.printf("  %-30s  %-16s  %-22s  %-22s%n",
                     hwName,
-                    formatScientific(effectiveSpeed),
+                    formatScientific(speed),
                     formatTime(tWorst),
                     formatTime(tAvg));
         }
 
         // Perbandingan dengan umur alam semesta (menggunakan T_avg GPU RTX 4090)
-        BigDecimal gpuBase     = (BigDecimal) HARDWARE_PROFILES[1][1];
-        BigDecimal gpuEffSpeed = gpuBase.multiply(roundFactor, MathContext.DECIMAL64);
-        BigDecimal tGpuAvg     = calculateTimeSeconds(keyspace, gpuEffSpeed.toBigInteger(), true);
-        BigDecimal ratio       = tGpuAvg.divide(AGE_OF_UNIVERSE_SECONDS, MathContext.DECIMAL64);
+        BigDecimal gpuSpeed = (BigDecimal) HARDWARE_PROFILES[1][1];
+        BigDecimal tGpuAvg  = calculateTimeSeconds(keyspace, gpuSpeed.toBigInteger(), true);
+        BigDecimal ratio    = tGpuAvg.divide(AGE_OF_UNIVERSE_SECONDS, MathContext.DECIMAL64);
 
         System.out.println();
-        System.out.printf("  Dengan GPU RTX 4090 (avg, AES-%d, %d round), waktu brute force:%n",
-                keyBits, rounds);
+        System.out.printf("  Dengan GPU RTX 4090 (avg, AES-%d), waktu brute force:%n", keyBits);
         if (ratio.compareTo(BigDecimal.ONE) < 0) {
             System.out.printf("  ≈ %s x umur alam semesta (SANGAT SINGKAT — TIDAK AMAN!)%n",
                     formatScientific(ratio));
@@ -132,16 +104,6 @@ public class AESBruteForceSimulation {
             System.out.printf("  ≈ %s x umur alam semesta%n", formatScientific(ratio));
         }
         printSeparator('=', 72);
-    }
-
-    //  HELPER: JUMLAH ROUND AES
-    private static int aesRounds(int keyBits) {
-        switch (keyBits) {
-            case 128: return AES_128_ROUNDS;
-            case 192: return AES_192_ROUNDS;
-            case 256: return AES_256_ROUNDS;
-            default:  throw new IllegalArgumentException("Ukuran kunci AES tidak valid: " + keyBits);
-        }
     }
 
     public static BigDecimal calculateTimeSeconds(BigInteger keyspace, BigInteger speed, boolean average) {
@@ -194,7 +156,7 @@ public class AESBruteForceSimulation {
     private static void printHeader() {
         System.out.println();
         printSeparator('=', 72);
-        System.out.println("   SIMULASI ESTIMASI BRUTE FORCE - AES (128 / 192 / 256 bit)");
+        System.out.println("   SIMULASI ESTIMASI BRUTE FORCE - AES-256");
         System.out.println("   Berdasarkan: Keyspace = 2^n  |  T = Keyspace / Speed");
         printSeparator('=', 72);
     }
